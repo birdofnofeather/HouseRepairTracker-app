@@ -104,7 +104,12 @@ main{max-width:1240px;margin:0 auto;padding:20px 18px 90px}
 .safebtn{background:none;border:none;font-size:16px;opacity:.25;padding:2px}
 .safebtn.on{opacity:1}
 .cost{font-size:12.5px;font-weight:600;text-align:right;white-space:nowrap}
-.cost small{display:block;font-weight:400;color:var(--ink2);font-size:10.5px}
+.cost small{display:block;font-weight:400;color:var(--ink2);font-size:10.5px;margin-top:2px}
+.costin{display:flex;align-items:center;gap:3px;justify-content:flex-end}
+.costin .dash{color:var(--ink2)}
+.costfield{width:54px;text-align:right;padding:3px 5px;font-size:12.5px;font-weight:600;border:1.5px solid var(--line);border-radius:6px;background:#fff}
+.costfield:focus{outline:none;border-color:var(--accent)}
+.costfield:disabled{background:transparent;border-color:transparent;color:var(--ink)}
 .upl{border:1.5px solid var(--line);background:#fff;border-radius:7px;padding:5px 8px;font-size:12px;font-weight:600;color:var(--ink2)}
 .upl:hover{border-color:var(--accent);color:var(--accent)}
 .subwrap{grid-column:1/-1;padding:2px 0 8px 64px}
@@ -234,7 +239,7 @@ details.budget summary{cursor:pointer;font-weight:700;font-size:15px;padding:6px
     </div>
     <label class="tb-label">Urgency ≥ <input type="range" id="fUrg" min="1" max="5" value="1"><span id="fUrgV">1</span></label>
     <label class="tb-label"><input type="checkbox" id="fSafe"> 🚨 Safety only</label>
-    <label class="tb-label"><input type="checkbox" id="fDone" checked> Show completed</label>
+    <label class="tb-label"><input type="checkbox" id="fDone"> Show completed</label>
     <select id="sortBy" class="mini" title="Sort">
       <option value="score">Sort: Priority</option>
       <option value="urgency">Sort: Urgency</option>
@@ -313,7 +318,7 @@ details.budget summary{cursor:pointer;font-weight:700;font-size:15px;padding:6px
 "use strict";
 /* ================= CONFIG (auth blobs injected at build time) ================= */
 const REPO = "birdofnofeather/HouseRepairTracker";
-const AUTH = [{"id": "MT", "name": "Max", "initials": "MT", "greet": "Hi Max!", "write": true, "salt": "uMKDuicdlVmzOes+GUJbGg==", "iv": "ECcmHoZSkcvr3O6R", "ct": "wNfpE+Gk2YsFa4k9q/GnOcXC0pwAqOKxtZ8RjVxNVx0/FHA0aALAwwAXzV03Na3ykpFfh6ietD2ZUOkksvetyQQ9SQ4lwYVw9SFE2c1O63y2YEkjs6JRgR/1uC4vfZr8PNtxCOC7F06De+Z0Dw=="}, {"id": "AB", "name": "Bog", "initials": "AB", "greet": "Hi Bog!", "write": true, "salt": "xqGmThgpowpD5QGi0Bhx8Q==", "iv": "oM4w+T87k3kzmX4Y", "ct": "Wur+yCGnL4FiMGGiqpaHTe+ZsUi08pSJFR7W3mUb2ixke3TRaBO+5K7WF/KJXNaQKLkdJ7SS5M0eapOj+Tn0J3MRL7JOwtabZXIaMwiVjswxAZ0ekpac9k+rlmFCGIaM9ED+oQmdQnnEOdVP2A=="}, {"id": "Guest", "name": "Guest", "initials": "G", "greet": "Welcome guest!", "write": false, "salt": "cZ5j3PTiaGmaKYzN15lNXA==", "iv": "c8JZjJLHuIOyuidj", "ct": "zSoqibchp3Inq/+g0iotpUEy/X8VhwmNEZv3w/LDtIZR+sCYznJ/+6KZzkTJKX7nN2Kid5TCXuE79s9QKu0BCY6zg9gzs3ofq4kiqhZtE74JuUoYM8V6oWLPD7o8o/m/zVtC41UHmv9bj/NMtg=="}];
+const AUTH = __AUTH_BLOBS__;
 const PBKDF2_ITERS = 310000;
 
 /* ================= UTIL ================= */
@@ -494,7 +499,7 @@ async function flushLog(){
 }
 
 /* ================= FILTERS ================= */
-const tf = {q:"", cat:"", urg:1, safe:false, done:true, sort:"score"};
+const tf = {q:"", cat:"", urg:1, safe:false, done:false, sort:"score"};
 const df = {urg:1, safe:false, cat:"", basis:"", done:false};
 
 function jobsFiltered(){
@@ -559,7 +564,14 @@ function renderTracker(){
       </select>
       <span class="score ${bc}" title="Priority = urgency × importance (${bl})">${sc}</span>
       <button class="safebtn ${j.safety?"on":""}" data-act="safety" data-j="${j.id}" ${CANWRITE?"":"disabled"} title="Toggle safety flag">🚨</button>
-      <span class="cost">${usd(j.estLow)}–${usd(j.estHigh)}<small>${j.estBasis==="quote"?"per quote":"researched"} · ${j.plannedYear||"—"}</small></span>
+      <span class="cost">
+        <span class="costin">
+          <input class="costfield" data-act="estlow" data-j="${j.id}" value="${j.estLow??0}" inputmode="decimal" ${CANWRITE?"":"disabled"} title="Estimate low ($)">
+          <span class="dash">–</span>
+          <input class="costfield" data-act="esthigh" data-j="${j.id}" value="${j.estHigh??0}" inputmode="decimal" ${CANWRITE?"":"disabled"} title="Estimate high ($)">
+        </span>
+        <small>${j.estBasis==="quote"?"per quote":"researched"} · ${j.plannedYear||"—"}</small>
+      </span>
       <select class="mini" data-act="who" data-j="${j.id}" ${CANWRITE?"":"disabled"}>
         <option value="">—</option><option ${j.assignee==="AB"?"selected":""}>AB</option><option ${j.assignee==="MT"?"selected":""}>MT</option>
       </select>
@@ -622,6 +634,8 @@ $("#jobList").addEventListener("change", e=>{
   else if(act==="imp"){ j.importance = +v; mutate(`${USER.initials} set importance of **${j.title}** to ${v}/5`); }
   else if(act==="who"){ j.assignee = v; mutate(`${USER.initials} assigned **${j.title}** to ${v||"nobody"}`); }
   else if(act==="subwho"){ const s = j.subtasks.find(x=>x.id===b.dataset.s); s.assignee = v; mutate(`${USER.initials} assigned subtask “${s.title}” (${j.title}) to ${v||"nobody"}`); }
+  else if(act==="estlow"){ const nv = parseAmt(v)??0; if(j.estLow!==nv){ j.estLow = nv; mutate(`${USER.initials} set low estimate on **${j.title}** to ${usd(nv)}`); } }
+  else if(act==="esthigh"){ const nv = parseAmt(v)??0; if(j.estHigh!==nv){ j.estHigh = nv; mutate(`${USER.initials} set high estimate on **${j.title}** to ${usd(nv)}`); } }
   renderTracker();
 });
 $("#jobList").addEventListener("submit", e=>{
