@@ -289,20 +289,6 @@ details.budget summary{cursor:pointer;font-weight:700;font-size:15px;padding:6px
       <div><div class="section-h" style="margin-top:0">By area</div><table class="mini-t" id="tblCat"></table></div>
     </div>
   </div>
-  <div class="card">
-    <details class="budget" id="budgetPanel">
-      <summary>💰 Budget planner (funds vs. projected costs)</summary>
-      <div class="budget-grid">
-        <label>Funds available (USD)<br><input id="funds" inputmode="numeric" placeholder="$0"></label>
-        <div style="flex:1;min-width:220px">
-          <div style="display:flex;justify-content:space-between;font-size:13px"><span id="fundPct"></span><span id="fundGap"></span></div>
-          <div class="fundbar"><div id="fundFill" style="width:0%"></div></div>
-          <div style="font-size:12px;color:var(--ink2)" id="fundNote"></div>
-        </div>
-      </div>
-      <table class="mini-t" id="tblFund"></table>
-    </details>
-  </div>
 </main>
 
 <main id="view-activity" hidden>
@@ -329,7 +315,11 @@ const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36
 const usd = n => n==null||isNaN(n) ? "—" : "$" + Number(n).toLocaleString("en-US",{maximumFractionDigits: Number.isInteger(+n)?0:2});
 const usdShort = n => n>=1000 ? "$"+Math.round(n/1000)+"k" : usd(n);
 const parseAmt = s => { const v = parseFloat(String(s).replace(/[$,\s]/g,"")); return isNaN(v)?null:v; };
-const mid = j => ((+j.estLow||0)+(+j.estHigh||+j.estLow||0))/2;
+const quoteAvg = j => {
+  const amts = (j.quotes||[]).map(q=>+q.amount).filter(n=>!isNaN(n) && n>0);
+  return amts.length ? amts.reduce((a,b)=>a+b,0)/amts.length : null;
+};
+const mid = j => { const qa = quoteAvg(j); return qa!=null ? qa : ((+j.estLow||0)+(+j.estHigh||+j.estLow||0))/2; };
 const score = j => (+j.urgency||1)*(+j.importance||1);
 const band = sc => sc>=20?["Critical","s-crit"]:sc>=15?["High","s-high"]:sc>=10?["Medium","s-med"]:["Low","s-low"];
 const URG_LABEL = {5:"5 · Now",4:"4 · <6 mo",3:"3 · <1 yr",2:"2 · 1–2 yrs",1:"1 · Someday"};
@@ -613,7 +603,7 @@ $("#jobList").addEventListener("click", e=>{
     const s = j.subtasks.find(x=>x.id===b.dataset.s);
     s.done = !s.done; s.doneBy = s.done ? USER.initials : null;
     flashEmoji(s.done ? "🏆" : "😢");
-    mutate(`${USER.initials} ${s.done?"completed":"reopened"} subtask “${s.title}” on **${j.title}**`);
+    mutate();
     renderTracker();
   }
   else if(act==="subdel"){
@@ -621,7 +611,7 @@ $("#jobList").addEventListener("click", e=>{
     const s = j.subtasks.find(x=>x.id===b.dataset.s);
     if(!confirm(`Delete subtask “${s.title}”?`)) return;
     j.subtasks = j.subtasks.filter(x=>x.id!==s.id);
-    mutate(`${USER.initials} deleted subtask “${s.title}” from **${j.title}**`);
+    mutate();
     renderTracker();
   }
 });
@@ -633,7 +623,7 @@ $("#jobList").addEventListener("change", e=>{
   else if(act==="urg"){ j.urgency = +v; mutate(`${USER.initials} set urgency of **${j.title}** to ${v}/5`); }
   else if(act==="imp"){ j.importance = +v; mutate(`${USER.initials} set importance of **${j.title}** to ${v}/5`); }
   else if(act==="who"){ j.assignee = v; mutate(`${USER.initials} assigned **${j.title}** to ${v||"nobody"}`); }
-  else if(act==="subwho"){ const s = j.subtasks.find(x=>x.id===b.dataset.s); s.assignee = v; mutate(`${USER.initials} assigned subtask “${s.title}” (${j.title}) to ${v||"nobody"}`); }
+  else if(act==="subwho"){ const s = j.subtasks.find(x=>x.id===b.dataset.s); s.assignee = v; mutate(); }
   else if(act==="estlow"){ const nv = parseAmt(v)??0; if(j.estLow!==nv){ j.estLow = nv; mutate(`${USER.initials} set low estimate on **${j.title}** to ${usd(nv)}`); } }
   else if(act==="esthigh"){ const nv = parseAmt(v)??0; if(j.estHigh!==nv){ j.estHigh = nv; mutate(`${USER.initials} set high estimate on **${j.title}** to ${usd(nv)}`); } }
   renderTracker();
@@ -644,7 +634,7 @@ $("#jobList").addEventListener("submit", e=>{
   const j = state.jobs.find(x=>x.id===f.dataset.j);
   const t = f.querySelector("input").value.trim(); if(!t) return;
   (j.subtasks ||= []).push({id:uid(), title:t, done:false, doneBy:null, assignee:""});
-  mutate(`${USER.initials} added subtask “${t}” to **${j.title}**`);
+  mutate();
   renderTracker();
 });
 
@@ -789,7 +779,7 @@ function renderJobModal(){
       q.basis = basis ? "quote" : "researched";
       const d = normalizeDate(prompt("Date of quote (any format):")||"") || new Date().toISOString().slice(0,10);
       q.date = d;
-      mutate(`${USER.initials} added a ${q.basis==="quote"?"quote":"researched estimate"} from ${q.contractor} (${usd(q.amount)}) to **${j.title}**`);
+      mutate();
       renderJobModal(); renderTracker();
     }
     else if(act==="delquote"){
@@ -797,7 +787,7 @@ function renderJobModal(){
       if(!confirm(`Delete the ${usd(q.amount)} quote from ${q.contractor}? Attached files will also be deleted.`)) return;
       for(const fl of (q.files||[])){ try{ await ghDeleteFile(fl.path, `${USER.id}: delete quote file`); }catch(e){ console.error(e);} }
       j.quotes = j.quotes.filter(x=>x.id!==q.id);
-      mutate(`${USER.initials} deleted the ${usd(q.amount)} quote from ${q.contractor} on **${j.title}**`);
+      mutate();
       renderJobModal(); renderTracker();
     }
     else if(act==="attach"){ openUploader(j.id, b.dataset.q); }
@@ -818,21 +808,21 @@ function renderJobModal(){
       if(!confirm(`Delete file “${fl.name}”?`)) return;
       try{ await ghDeleteFile(fl.path, `${USER.id}: delete quote file ${fl.name}`); }catch(e){ alert("Delete failed: "+e.message); return; }
       q.files = q.files.filter(x=>x.path!==fl.path);
-      mutate(`${USER.initials} deleted quote file “${fl.name}” from **${j.title}**`);
+      mutate();
       renderJobModal();
     }
     else if(act==="subdone"){
       const s = j.subtasks.find(x=>x.id===b.dataset.s);
       s.done = !s.done; s.doneBy = s.done?USER.initials:null;
       flashEmoji(s.done?"🏆":"😢");
-      mutate(`${USER.initials} ${s.done?"completed":"reopened"} subtask “${s.title}” on **${j.title}**`);
+      mutate();
       renderJobModal(); renderTracker();
     }
     else if(act==="subdel"){
       const s = j.subtasks.find(x=>x.id===b.dataset.s);
       if(!confirm(`Delete subtask “${s.title}”?`)) return;
       j.subtasks = j.subtasks.filter(x=>x.id!==s.id);
-      mutate(`${USER.initials} deleted subtask “${s.title}” from **${j.title}**`);
+      mutate();
       renderJobModal(); renderTracker();
     }
     else if(act==="deljob"){
@@ -846,7 +836,7 @@ function renderJobModal(){
     const b = e.target.closest("[data-m=subwho]"); if(!b||!CANWRITE) return;
     const s = j.subtasks.find(x=>x.id===b.dataset.s);
     s.assignee = b.value;
-    mutate(`${USER.initials} assigned subtask “${s.title}” (${j.title}) to ${b.value||"nobody"}`);
+    mutate();
     renderTracker();
   });
   const asf = $("#mAddSub");
@@ -854,7 +844,7 @@ function renderJobModal(){
     e.preventDefault();
     const t = asf.querySelector("input").value.trim(); if(!t) return;
     (j.subtasks ||= []).push({id:uid(), title:t, done:false, doneBy:null, assignee:""});
-    mutate(`${USER.initials} added subtask “${t}” to **${j.title}**`);
+    mutate();
     renderJobModal(); renderTracker();
   });
   function commitAndClose(){
@@ -973,7 +963,7 @@ function openUploader(jobId, quoteId){
       }
       (q.files ||= []).push({name:fname, path, uploadedBy:USER.initials, uploadedAt:new Date().toISOString()});
       if(jobName!==j.title && jobName){ /* user corrected job name in uploader */ j.title = jobName; }
-      mutate(`${USER.initials} uploaded quote file “${fname}” (${con}, ${usd(amt)}) to **${j.title}**`);
+      mutate();
       close();
       if(modalJobId===j.id) renderJobModal();
       renderTracker();
@@ -1032,23 +1022,6 @@ function renderDashboard(){
     rowsBy(j=>URG_LABEL[+j.urgency||1], [5,4,3,2,1].map(u=>URG_LABEL[u]));
   $("#tblCat").innerHTML = `<tr><th>Area</th><th class="r"># Jobs</th><th class="r">Est. range</th></tr>` +
     rowsBy(j=>j.category||"—", ["Exterior","Interior","Systems"]);
-
-  // budget planner
-  const funds = +state.settings.fundsAvailable||0;
-  $("#funds").value = funds ? funds.toLocaleString("en-US") : "";
-  const midTot = open.reduce((a,j)=>a+mid(j),0);
-  const pct = midTot ? Math.min(100, funds/midTot*100) : 0;
-  $("#fundFill").style.width = pct+"%";
-  $("#fundPct").textContent = `Funds cover ~${Math.round(pct)}% of projected (${usd(Math.round(midTot))} mid)`;
-  $("#fundGap").textContent = funds>=midTot ? `Surplus ${usd(Math.round(funds-midTot))}` : `Gap ${usd(Math.round(midTot-funds))}`;
-  $("#fundNote").textContent = "Mid-point planning figures. Update funds any time — saved automatically.";
-  let cum = 0;
-  $("#tblFund").innerHTML = `<tr><th>Year</th><th class="r">Projected (mid)</th><th class="r">Cumulative</th><th class="r">Funds left after</th></tr>` +
-    ykeys.map(y=>{
-      const tot = Object.values(years[y]).reduce((a,b)=>a+b,0); cum += tot;
-      const left = funds-cum;
-      return `<tr><td>${y}</td><td class="r">${usd(Math.round(tot))}</td><td class="r">${usd(Math.round(cum))}</td><td class="r" style="color:${left<0?"var(--red)":"var(--accent2)"}">${usd(Math.round(left))}</td></tr>`;
-    }).join("");
 }
 $("#dUrg").addEventListener("input", e=>{ df.urg = +e.target.value; $("#dUrgV").textContent = e.target.value; renderDashboard(); });
 $("#dSafe").addEventListener("change", e=>{ df.safe = e.target.checked; renderDashboard(); });
@@ -1058,13 +1031,6 @@ $("#dCatChips").addEventListener("click", e=>{
   const c = e.target.closest(".chip"); if(!c) return;
   df.cat = c.dataset.cat;
   $$("#dCatChips .chip").forEach(x=>x.classList.toggle("on", x===c));
-  renderDashboard();
-});
-$("#funds").addEventListener("change", e=>{
-  if(!CANWRITE){ renderDashboard(); return; }
-  const v = parseAmt(e.target.value)||0;
-  state.settings.fundsAvailable = v;
-  mutate(`${USER.initials} set funds available to ${usd(v)}`);
   renderDashboard();
 });
 
