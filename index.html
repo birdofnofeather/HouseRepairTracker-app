@@ -184,8 +184,10 @@ details.budget summary{cursor:pointer;font-weight:700;font-size:15px;padding:6px
 .section-h{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);margin:20px 0 4px}
 
 /* ---------- activity ---------- */
-.logline{padding:8px 4px;border-bottom:1px solid #f0eee8;font-size:13.5px}
-.logline .t{color:var(--ink2);font-size:12px;margin-right:8px}
+.logcard{border:1px solid var(--line);border-radius:9px;padding:9px 13px;margin-bottom:9px;background:#fdfdfb}
+.logcard-h{font-size:12px;font-weight:700;color:var(--ink2);margin-bottom:4px}
+.logcard-items{margin:0;padding-left:18px}
+.logcard-items li{font-size:13.5px;line-height:1.55}
 
 @media(max-width:900px){
   .job-head{display:none}
@@ -429,20 +431,20 @@ async function ghGetRaw(path){ // returns Blob (for viewing uploads incl. large/
 }
 
 /* ================= STATE & PERSISTENCE ================= */
-let state = null, dataSha = null;
+let state = null, dataSha = null, lastSavedState = null;
 let dirty = false, saveTimer = null, saving = false;
-let logQueue = [];
 
 function setSaveStatus(msg, err){ const el = $("#saveStatus"); el.textContent = msg; el.classList.toggle("err", !!err); }
+const clone = o => JSON.parse(JSON.stringify(o));
 
 async function loadData(){
   const f = await ghGetFile("data/data.json");
   if(f){ state = JSON.parse(f.text); dataSha = f.sha; }
   else { state = {version:1, settings:{fundsAvailable:0}, jobs:[]}; dataSha = null; }
+  lastSavedState = clone(state);
 }
-function mutate(logMsg){
+function mutate(){
   if(!CANWRITE) return false;
-  if(logMsg) logQueue.push(logMsg);
   dirty = true;
   setSaveStatus("Unsaved changes…");
   clearTimeout(saveTimer);
@@ -453,6 +455,7 @@ async function saveNow(){
   if(!dirty || saving || !CANWRITE) return;
   saving = true; dirty = false;
   setSaveStatus("Saving…");
+  const changes = diffState(lastSavedState, state);
   try{
     const content = utf8ToB64(JSON.stringify(state, null, 1));
     try{
@@ -465,7 +468,8 @@ async function saveNow(){
         dataSha = r.content.sha;
       } else throw e;
     }
-    await flushLog();
+    lastSavedState = clone(state);
+    if(changes.length) await appendChangelog(changes);
     setSaveStatus("All changes saved ✓ " + new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}));
   }catch(e){
     console.error(e); dirty = true;
@@ -475,17 +479,70 @@ async function saveNow(){
 }
 window.addEventListener("beforeunload", e=>{ if(dirty||saving){ e.preventDefault(); e.returnValue=""; } });
 
-async function flushLog(){
-  if(!logQueue.length) return;
-  const entries = logQueue.splice(0);
-  const lines = entries.map(m=>`- **${nowStamp()}** — ${m}`).join("\n");
+/* ---- diff two state snapshots into a flat list of human-readable, net/durable changes ---- */
+function diffState(oldS, newS){
+  const lines = [];
+  const oldJobs = new Map((oldS.jobs||[]).map(j=>[j.id,j]));
+  const newJobs = new Map((newS.jobs||[]).map(j=>[j.id,j]));
+  for(const [id,oj] of oldJobs){ if(!newJobs.has(id)) lines.push(`Deleted job **${oj.title}**`); }
+  const fieldMap = {category:"area", status:"status", estBasis:"estimate basis", plannedYear:"planned year", assignee:"assignee", why:"the “why”", notes:"notes"};
+  for(const [id,nj] of newJobs){
+    const oj = oldJobs.get(id);
+    if(!oj){ lines.push(`Added job **${nj.title}**`); continue; }
+    const label = nj.title;
+    if((oj.title||"") !== (nj.title||"")) lines.push(`Renamed **${oj.title}** to **${nj.title}**`);
+    if((+oj.urgency||0) !== (+nj.urgency||0)) lines.push(`Set urgency of **${label}** to ${nj.urgency}/5`);
+    if((+oj.importance||0) !== (+nj.importance||0)) lines.push(`Set importance of **${label}** to ${nj.importance}/5`);
+    for(const [k,desc] of Object.entries(fieldMap)){
+      if((oj[k]||"") !== (nj[k]||"")) lines.push(`Set ${desc} of **${label}** to ${nj[k]||"—"}`);
+    }
+    if((+oj.estLow||0) !== (+nj.estLow||0)) lines.push(`Set low estimate of **${label}** to ${usd(nj.estLow)}`);
+    if((+oj.estHigh||0) !== (+nj.estHigh||0)) lines.push(`Set high estimate of **${label}** to ${usd(nj.estHigh)}`);
+    if(!!oj.safety !== !!nj.safety) lines.push(`${nj.safety?"Flagged":"Unflagged"} **${label}** as a safety issue`);
+    if(!!oj.done !== !!nj.done) lines.push(nj.done ? `Completed job **${label}**${nj.doneBy?" ("+nj.doneBy+")":""}` : `Reopened job **${label}**`);
+    const os = new Map((oj.subtasks||[]).map(s=>[s.id,s]));
+    const ns = new Map((nj.subtasks||[]).map(s=>[s.id,s]));
+    for(const [sid,os_] of os){ if(!ns.has(sid)) lines.push(`Deleted subtask “${os_.title}” from **${label}**`); }
+    for(const [sid,ns_] of ns){
+      const os_ = os.get(sid);
+      if(!os_){ lines.push(`Added subtask “${ns_.title}” to **${label}**`); continue; }
+      if((os_.title||"") !== (ns_.title||"")) lines.push(`Renamed subtask “${os_.title}” to “${ns_.title}” on **${label}**`);
+      if(!!os_.done !== !!ns_.done) lines.push(ns_.done ? `Completed subtask “${ns_.title}”${ns_.doneBy?" ("+ns_.doneBy+")":""} on **${label}**` : `Reopened subtask “${ns_.title}” on **${label}**`);
+      if((os_.assignee||"") !== (ns_.assignee||"")) lines.push(`Assigned subtask “${ns_.title}” (${label}) to ${ns_.assignee||"nobody"}`);
+    }
+    const oq = new Map((oj.quotes||[]).map(q=>[q.id,q]));
+    const nq = new Map((nj.quotes||[]).map(q=>[q.id,q]));
+    for(const [qid,oq_] of oq){ if(!nq.has(qid)) lines.push(`Deleted quote from ${oq_.contractor||"(unnamed)"} (${usd(oq_.amount)}) on **${label}**`); }
+    for(const [qid,nq_] of nq){
+      const oq_ = oq.get(qid);
+      if(!oq_){
+        lines.push(`Added ${nq_.basis==="quote"?"quote":"researched estimate"} from ${nq_.contractor||"(unnamed)"} (${usd(nq_.amount)}) to **${label}**`);
+        (nq_.files||[]).forEach(f=>lines.push(`Uploaded quote file “${f.name}” (${nq_.contractor||"(unnamed)"}) to **${label}**`));
+        continue;
+      }
+      const oldPaths = new Set((oq_.files||[]).map(f=>f.path));
+      const newPaths = new Set((nq_.files||[]).map(f=>f.path));
+      (nq_.files||[]).filter(f=>!oldPaths.has(f.path)).forEach(f=>lines.push(`Uploaded quote file “${f.name}” (${nq_.contractor||"(unnamed)"}) to **${label}**`));
+      (oq_.files||[]).filter(f=>!newPaths.has(f.path)).forEach(f=>lines.push(`Deleted quote file “${f.name}” from **${label}**`));
+      if((+oq_.amount||0)!==(+nq_.amount||0) || (oq_.contractor||"")!==(nq_.contractor||"") || (oq_.basis||"")!==(nq_.basis||"") || (oq_.date||"")!==(nq_.date||"")){
+        lines.push(`Updated quote from ${nq_.contractor||"(unnamed)"} (${usd(nq_.amount)}) on **${label}**`);
+      }
+    }
+  }
+  return lines;
+}
+
+/* ---- write every net change from one save cycle as a single changelog card ---- */
+async function appendChangelog(lines){
+  if(!lines.length) return;
+  const block = `- **${nowStamp()} — ${USER.initials}**\n` + lines.map(l=>`  - ${l}`).join("\n") + "\n";
   try{
     const f = await ghGetFile("CHANGELOG.md");
     let text = f ? f.text : "# Activity Log — Our House Repair Tracker\n\n";
     const idx = text.indexOf("\n\n");
-    text = idx>=0 ? text.slice(0,idx+2) + lines + "\n" + text.slice(idx+2) : text + "\n" + lines + "\n";
+    text = idx>=0 ? text.slice(0,idx+2) + block + "\n" + text.slice(idx+2) : text + "\n" + block + "\n";
     await ghPutFile("CHANGELOG.md", utf8ToB64(text), `${USER.id}: log activity`, f && f.sha);
-  }catch(e){ console.error("log flush failed", e); logQueue.unshift(...entries); }
+  }catch(e){ console.error("log append failed", e); }
 }
 
 /* ================= FILTERS ================= */
@@ -589,13 +646,13 @@ $("#jobList").addEventListener("click", e=>{
     j.doneBy = j.done ? USER.initials : null;
     j.doneAt = j.done ? new Date().toISOString() : null;
     flashEmoji(j.done ? "🏆" : "😢");
-    mutate(`${USER.initials} ${j.done?"completed":"reopened"} job **${j.title}**`);
+    mutate();
     renderTracker();
   }
   else if(act==="safety"){
     if(!CANWRITE) return;
     j.safety = !j.safety;
-    mutate(`${USER.initials} ${j.safety?"flagged":"unflagged"} **${j.title}** as a safety issue`);
+    mutate();
     renderTracker();
   }
   else if(act==="subdone"){
@@ -619,13 +676,13 @@ $("#jobList").addEventListener("change", e=>{
   const b = e.target.closest("[data-act]"); if(!b || !CANWRITE) return;
   const j = state.jobs.find(x=>x.id===b.dataset.j); if(!j) return;
   const act = b.dataset.act, v = b.value;
-  if(act==="cat"){ j.category = v; mutate(`${USER.initials} set area of **${j.title}** to ${v}`); }
-  else if(act==="urg"){ j.urgency = +v; mutate(`${USER.initials} set urgency of **${j.title}** to ${v}/5`); }
-  else if(act==="imp"){ j.importance = +v; mutate(`${USER.initials} set importance of **${j.title}** to ${v}/5`); }
-  else if(act==="who"){ j.assignee = v; mutate(`${USER.initials} assigned **${j.title}** to ${v||"nobody"}`); }
+  if(act==="cat"){ j.category = v; mutate(); }
+  else if(act==="urg"){ j.urgency = +v; mutate(); }
+  else if(act==="imp"){ j.importance = +v; mutate(); }
+  else if(act==="who"){ j.assignee = v; mutate(); }
   else if(act==="subwho"){ const s = j.subtasks.find(x=>x.id===b.dataset.s); s.assignee = v; mutate(); }
-  else if(act==="estlow"){ const nv = parseAmt(v)??0; if(j.estLow!==nv){ j.estLow = nv; mutate(`${USER.initials} set low estimate on **${j.title}** to ${usd(nv)}`); } }
-  else if(act==="esthigh"){ const nv = parseAmt(v)??0; if(j.estHigh!==nv){ j.estHigh = nv; mutate(`${USER.initials} set high estimate on **${j.title}** to ${usd(nv)}`); } }
+  else if(act==="estlow"){ const nv = parseAmt(v)??0; if(j.estLow!==nv){ j.estLow = nv; mutate(); } }
+  else if(act==="esthigh"){ const nv = parseAmt(v)??0; if(j.estHigh!==nv){ j.estHigh = nv; mutate(); } }
   renderTracker();
 });
 $("#jobList").addEventListener("submit", e=>{
@@ -657,7 +714,7 @@ $("#addJobBtn").addEventListener("click", ()=>{
     plannedYear:new Date().getFullYear(), done:false, doneBy:null, doneAt:null, subtasks:[], quotes:[],
     createdAt:new Date().toISOString()};
   state.jobs.unshift(j);
-  mutate(`${USER.initials} added job **New job**`);
+  mutate();
   renderTracker(); openJobModal(j.id);
 });
 
@@ -749,7 +806,7 @@ function renderJobModal(){
       let v = numeric ? (parseAmt(el.value)??0) : el.value;
       if(j[key]===v) return;
       j[key] = v;
-      mutate(`${USER.initials} updated ${label} on **${j.title}**`);
+      mutate();
       if(key==="title") $("#mTitleTxt").textContent = v;
       renderTracker();
     });
@@ -761,8 +818,8 @@ function renderJobModal(){
   commitField($("#mLow"),"estLow","low estimate",true);
   commitField($("#mHigh"),"estHigh","high estimate",true);
   commitField($("#mBasis"),"estBasis","estimate basis");
-  $("#mYear").addEventListener("change", ()=>{ j.plannedYear = +$("#mYear").value; mutate(`${USER.initials} set planned year of **${j.title}** to ${j.plannedYear}`); renderTracker(); });
-  $("#mSafety").addEventListener("change", ()=>{ j.safety = $("#mSafety").value==="yes"; mutate(`${USER.initials} ${j.safety?"flagged":"unflagged"} **${j.title}** as a safety issue`); renderTracker(); renderJobModal(); });
+  $("#mYear").addEventListener("change", ()=>{ j.plannedYear = +$("#mYear").value; mutate(); renderTracker(); });
+  $("#mSafety").addEventListener("change", ()=>{ j.safety = $("#mSafety").value==="yes"; mutate(); renderTracker(); renderJobModal(); });
 
   bg.addEventListener("click", async e=>{
     const b = e.target.closest("[data-m]"); if(!b) return;
@@ -828,7 +885,7 @@ function renderJobModal(){
     else if(act==="deljob"){
       if(!confirm(`Delete the whole job “${j.title}”? Uploaded files stay in the repository.`)) return;
       state.jobs = state.jobs.filter(x=>x.id!==j.id);
-      mutate(`${USER.initials} deleted job **${j.title}**`);
+      mutate();
       commitAndClose(); renderTracker();
     }
   });
@@ -1041,12 +1098,23 @@ async function renderActivity(){
   try{
     const f = await ghGetFile("CHANGELOG.md");
     if(!f){ host.textContent = "No activity yet."; return; }
-    const lines = f.text.split("\n").filter(l=>l.startsWith("- "));
-    host.innerHTML = lines.slice(0,300).map(l=>{
-      const m = l.match(/^- \*\*(.+?)\*\* — (.*)$/);
-      const body = (m?m[2]:l.slice(2)).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/“|”/g,'"');
-      return `<div class="logline"><span class="t">${esc(m?m[1]:"")}</span>${body}</div>`;
-    }).join("") || "No activity yet.";
+    const raw = f.text.split("\n");
+    const blocks = [];
+    let cur = null;
+    for(const line of raw){
+      const h = line.match(/^- \*\*(.+?)\*\*\s*$/);
+      if(h){ cur = {header:h[1], items:[]}; blocks.push(cur); continue; }
+      const it = line.match(/^\s{2}- (.*)$/);
+      if(it && cur){ cur.items.push(it[1]); continue; }
+      const old = line.match(/^- \*\*(.+?)\*\* — (.*)$/); // legacy single-line entries
+      if(old){ blocks.push({header:old[1], items:[old[2]]}); }
+    }
+    const fmt = t => esc(t).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>");
+    host.innerHTML = blocks.slice(0,200).map(b=>`
+      <div class="logcard">
+        <div class="logcard-h">${esc(b.header)}</div>
+        <ul class="logcard-items">${b.items.map(t=>`<li>${fmt(t)}</li>`).join("") || "<li>(no details)</li>"}</ul>
+      </div>`).join("") || "No activity yet.";
   }catch(e){ host.textContent = "Could not load log: "+e.message; }
 }
 
