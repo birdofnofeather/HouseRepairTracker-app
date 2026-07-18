@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Our House — Repair &amp; Maintenance Tracker</title>
+<style>
+:root{
+  --bg:#f4f3ef; --card:#ffffff; --ink:#232323; --ink2:#6b6b66; --line:#e5e2da;
+  --accent:#2f6f4f; --accent2:#1f4f38; --red:#c0392b; --orange:#e07b00; --yellow:#c9a400;
+  --green:#3a8f5f; --gray:#9a9a94; --blue:#3a6ea5;
+  --u5:#c0392b; --u4:#e07b00; --u3:#c9a400; --u2:#7fa653; --u1:#9a9a94;
+  --shadow:0 1px 3px rgba(30,30,25,.08),0 6px 24px rgba(30,30,25,.07);
+  --r:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:var(--ink)}
+h1,h2,h3{margin:0}
+[hidden]{display:none!important}
+
+/* ---------- login ---------- */
+#login{position:fixed;inset:0;background:linear-gradient(160deg,#20372b,#0f1f17);display:flex;align-items:center;justify-content:center;z-index:100}
+.login-card{background:var(--card);border-radius:16px;box-shadow:var(--shadow);padding:38px 40px;width:min(400px,92vw);text-align:center}
+.login-card .house{font-size:44px}
+.login-card h1{font-size:21px;margin:8px 0 2px}
+.login-card p.sub{color:var(--ink2);margin:0 0 22px;font-size:13px}
+.login-card input{width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:8px;font-size:16px;text-align:center;letter-spacing:.08em}
+.login-card input:focus{outline:none;border-color:var(--accent)}
+.login-card button{margin-top:14px;width:100%;padding:12px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;font-size:15px}
+.login-card button:hover{background:var(--accent2)}
+.login-err{color:var(--red);font-size:13px;min-height:18px;margin-top:10px}
+.login-note{margin-top:18px;font-size:12px;color:var(--ink2)}
+
+/* ---------- flashes ---------- */
+.flash-overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:200;pointer-events:none}
+.flash-text{font-size:clamp(44px,9vw,96px);font-weight:800;color:#fff;text-shadow:0 4px 30px rgba(0,0,0,.35);animation:flashy 1.6s ease forwards}
+.flash-bg{position:fixed;inset:0;background:rgba(20,40,30,.88);z-index:199;animation:fadebg 1.6s ease forwards}
+.flash-emoji{font-size:clamp(90px,18vw,190px);animation:pop 1.1s ease forwards}
+@keyframes flashy{0%{opacity:0;transform:scale(.8)}18%{opacity:1;transform:scale(1.04)}70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.05)}}
+@keyframes fadebg{0%{opacity:0}15%{opacity:1}75%{opacity:1}100%{opacity:0}}
+@keyframes pop{0%{opacity:0;transform:scale(.3) rotate(-8deg)}25%{opacity:1;transform:scale(1.15) rotate(3deg)}55%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.25)}}
+
+/* ---------- header ---------- */
+header.app{position:sticky;top:0;z-index:50;background:#243b2e;color:#fff;display:flex;align-items:center;gap:14px;padding:10px 18px;flex-wrap:wrap}
+header.app .brand{font-weight:700;font-size:16px;display:flex;gap:8px;align-items:center}
+header.app .brand small{font-weight:400;opacity:.75;font-size:12px}
+nav.tabs{display:flex;gap:4px;margin-left:6px}
+nav.tabs button{background:transparent;border:none;color:#cfe0d5;padding:8px 14px;border-radius:8px;font-weight:600;font-size:14px}
+nav.tabs button.active{background:rgba(255,255,255,.16);color:#fff}
+nav.tabs button:hover{background:rgba(255,255,255,.1);color:#fff}
+.spacer{flex:1}
+.userchip{display:flex;align-items:center;gap:8px;font-size:13px}
+.userchip .init{background:#fff;color:#243b2e;font-weight:800;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:12px}
+.ro-badge{background:#e07b00;color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+#saveStatus{font-size:12px;color:#bcd3c5;min-width:120px;text-align:right}
+#saveStatus.err{color:#ffb3a7}
+.logout{background:transparent;border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:7px;padding:5px 11px;font-size:12px}
+
+/* ---------- layout ---------- */
+main{max-width:1240px;margin:0 auto;padding:20px 18px 90px}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:16px 18px;margin-bottom:16px}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.toolbar input[type=search]{padding:8px 12px;border:1.5px solid var(--line);border-radius:8px;min-width:180px;flex:1;max-width:280px}
+.toolbar select{padding:8px 10px;border:1.5px solid var(--line);border-radius:8px;background:#fff}
+.chiprow{display:flex;gap:6px}
+.chip{border:1.5px solid var(--line);background:#fff;border-radius:20px;padding:6px 13px;font-size:13px;font-weight:600;color:var(--ink2)}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.tb-label{font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:6px;font-weight:600}
+.tb-label input[type=range]{accent-color:var(--accent)}
+.tb-label input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+.btn{border:none;border-radius:8px;padding:9px 16px;font-weight:600;font-size:14px}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent2)}
+.btn.ghost{background:#fff;border:1.5px solid var(--line);color:var(--ink)}
+.btn.danger{background:#fdeeec;color:var(--red);border:1px solid #f3cdc7}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:7px}
+
+/* ---------- job list ---------- */
+.job-head,.job-row{display:grid;grid-template-columns:26px 30px minmax(220px,1fr) 96px 118px 54px 60px 46px 130px 64px 84px;gap:8px;align-items:center;padding:9px 12px}
+.job-head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);font-weight:700;border-bottom:1px solid var(--line)}
+.job-row{border-bottom:1px solid #f0eee8;transition:background .12s}
+.job-row:hover{background:#faf9f5}
+.job-row.done .jtitle{color:var(--gray);text-decoration:line-through}
+.caret{background:none;border:none;color:var(--ink2);font-size:12px;width:22px;height:22px;border-radius:5px;padding:0}
+.caret:hover{background:#eee}
+.caret.open{transform:rotate(90deg)}
+.cbx{width:22px;height:22px;border:2px solid #c9c6bd;border-radius:6px;background:#fff;display:flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;color:#fff;padding:0}
+.cbx.done{background:var(--accent);border-color:var(--accent)}
+.cbx:disabled{cursor:not-allowed;opacity:.6}
+.jtitle{font-weight:600;font-size:14.5px;cursor:pointer;display:flex;align-items:center;gap:7px;flex-wrap:wrap;text-align:left;background:none;border:none;padding:0;color:var(--ink)}
+.jtitle:hover{color:var(--accent)}
+.jtitle .safety{font-size:13px}
+.jtitle .qcount{font-size:11px;color:var(--ink2);font-weight:600;background:#f0efe9;border-radius:10px;padding:1px 7px}
+.jtitle .whyhint{font-weight:400;font-size:12px;color:var(--ink2);width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:420px}
+.mini{padding:5px 6px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:12.5px;max-width:100%}
+.score{font-weight:800;font-size:12px;border-radius:7px;padding:4px 0;text-align:center;color:#fff}
+.s-crit{background:var(--u5)} .s-high{background:var(--u4)} .s-med{background:var(--u3)} .s-low{background:var(--u2)}
+.safebtn{background:none;border:none;font-size:16px;opacity:.25;padding:2px}
+.safebtn.on{opacity:1}
+.cost{font-size:12.5px;font-weight:600;text-align:right;white-space:nowrap}
+.cost small{display:block;font-weight:400;color:var(--ink2);font-size:10.5px}
+.upl{border:1.5px solid var(--line);background:#fff;border-radius:7px;padding:5px 8px;font-size:12px;font-weight:600;color:var(--ink2)}
+.upl:hover{border-color:var(--accent);color:var(--accent)}
+.subwrap{grid-column:1/-1;padding:2px 0 8px 64px}
+.subrow{display:flex;align-items:center;gap:9px;padding:4px 0}
+.subrow .cbx{width:19px;height:19px;border-radius:5px;font-size:8.5px}
+.subrow .stitle{flex:1;font-size:13.5px}
+.subrow.done .stitle{color:var(--gray);text-decoration:line-through}
+.subrow .del{background:none;border:none;color:#c9c6bd;font-size:15px;padding:0 4px}
+.subrow .del:hover{color:var(--red)}
+.addsub{display:flex;gap:8px;margin-top:6px}
+.addsub input{flex:1;max-width:340px;padding:6px 10px;border:1.5px dashed var(--line);border-radius:7px;font-size:13px;background:transparent}
+.list-foot{display:flex;justify-content:flex-end;gap:26px;padding:14px 12px;font-size:13.5px;color:var(--ink2)}
+.list-foot b{color:var(--ink)}
+.empty{padding:40px;text-align:center;color:var(--ink2)}
+
+/* ---------- dashboard ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.kpi{background:var(--card);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px}
+.kpi .lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);font-weight:700}
+.kpi .val{font-size:22px;font-weight:800;margin-top:4px}
+.kpi .val.red{color:var(--red)}
+.kpi .sub{font-size:11.5px;color:var(--ink2)}
+.yearbar{display:flex;height:26px;border-radius:6px;overflow:hidden;background:#f0efe9}
+.yearbar div{height:100%}
+.yrow{display:grid;grid-template-columns:64px 1fr 170px;gap:12px;align-items:center;margin:9px 0}
+.yrow .ylab{font-weight:700}
+.yrow .ytot{font-size:13px;text-align:right;color:var(--ink2)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink2);margin-top:10px}
+.legend span{display:flex;align-items:center;gap:5px}
+.dot{width:11px;height:11px;border-radius:3px;display:inline-block}
+table.mini-t{width:100%;border-collapse:collapse;font-size:13.5px}
+table.mini-t th{text-align:left;font-size:11px;text-transform:uppercase;color:var(--ink2);padding:7px 8px;border-bottom:1px solid var(--line)}
+table.mini-t td{padding:7px 8px;border-bottom:1px solid #f0eee8}
+table.mini-t td.r,table.mini-t th.r{text-align:right}
+details.budget{margin-top:16px}
+details.budget summary{cursor:pointer;font-weight:700;font-size:15px;padding:6px 2px}
+.budget-grid{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.budget-grid label{font-size:13px;font-weight:600;color:var(--ink2)}
+.budget-grid input{padding:8px 12px;border:1.5px solid var(--line);border-radius:8px;width:160px}
+.fundbar{height:14px;border-radius:8px;background:#eceae3;overflow:hidden;margin:8px 0}
+.fundbar div{height:100%;background:var(--accent)}
+
+/* ---------- modals ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(25,25,20,.45);z-index:80;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:4vh 14px}
+.modal{background:var(--card);border-radius:14px;box-shadow:var(--shadow);width:min(780px,96vw);padding:22px 26px;margin-bottom:6vh}
+.modal.narrow{width:min(520px,96vw)}
+.modal h2{font-size:18px;display:flex;align-items:center;gap:10px}
+.modal .xclose{margin-left:auto;background:none;border:none;font-size:20px;color:var(--ink2);padding:2px 6px}
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.fgrid .full{grid-column:1/-1}
+.f label{display:block;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink2);margin-bottom:4px}
+.f input,.f select,.f textarea{width:100%;padding:8px 11px;border:1.5px solid var(--line);border-radius:8px;background:#fff}
+.f textarea{resize:vertical;min-height:64px}
+.f input:focus,.f textarea:focus,.f select:focus{outline:none;border-color:var(--accent)}
+.f .hint{font-size:11.5px;color:var(--ink2);margin-top:3px;min-height:14px}
+.f .hint.bad{color:var(--red)}
+.qcard{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:10px}
+.qcard .qtop{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.qcard .qtop b{font-size:14.5px}
+.qcard .amt{font-weight:800;color:var(--accent2)}
+.qcard .tag{font-size:10.5px;font-weight:700;text-transform:uppercase;background:#eef3ee;color:var(--accent2);padding:2px 8px;border-radius:10px}
+.qcard .tag.est{background:#fbf3e2;color:#8a6d1a}
+.qcard .qdate{font-size:12px;color:var(--ink2)}
+.qfiles{margin-top:8px;display:flex;flex-direction:column;gap:5px}
+.qfile{display:flex;align-items:center;gap:8px;font-size:12.5px;background:#faf9f5;border-radius:7px;padding:5px 9px}
+.qfile .fn{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qfile button{background:none;border:none;font-size:12px;color:var(--blue);padding:1px 5px;font-weight:600}
+.qfile button.rm{color:var(--red)}
+.qact{display:flex;gap:8px;margin-top:9px}
+.modal-actions{display:flex;gap:10px;margin-top:20px;align-items:center}
+.modal-actions .right{margin-left:auto;display:flex;gap:10px}
+.section-h{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--ink2);margin:20px 0 4px}
+
+/* ---------- activity ---------- */
+.logline{padding:8px 4px;border-bottom:1px solid #f0eee8;font-size:13.5px}
+.logline .t{color:var(--ink2);font-size:12px;margin-right:8px}
+
+@media(max-width:900px){
+  .job-head{display:none}
+  .job-row{grid-template-columns:24px 28px 1fr 70px;grid-auto-flow:dense}
+  .job-row>*{grid-column:auto}
+  .job-row .jtitle{grid-column:3/5}
+  .fgrid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="login-card">
+    <div class="house">🏠</div>
+    <h1>Our House</h1>
+    <p class="sub">Repair &amp; Maintenance Tracker · 1925 Duplex · El Sereno</p>
+    <form id="loginForm">
+      <input id="pw" type="password" placeholder="Password" autocomplete="current-password" autofocus>
+      <div class="login-err" id="loginErr"></div>
+      <button type="submit">Enter</button>
+    </form>
+    <div class="login-note">Guest access is <b>read&#8209;only</b>.</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" hidden>
+<header class="app">
+  <div class="brand">🏠 Our House <small>Repair &amp; Maintenance Tracker</small></div>
+  <nav class="tabs">
+    <button data-tab="tracker" class="active">Tracker</button>
+    <button data-tab="dashboard">Budget &amp; Dashboard</button>
+    <button data-tab="activity">Activity</button>
+  </nav>
+  <div class="spacer"></div>
+  <div id="saveStatus"></div>
+  <div class="userchip" id="userchip"></div>
+  <button class="logout" onclick="location.reload()">Log out</button>
+</header>
+
+<main id="view-tracker">
+  <div class="card toolbar">
+    <input type="search" id="q" placeholder="Search jobs…">
+    <div class="chiprow" id="catChips">
+      <button class="chip on" data-cat="">All</button>
+      <button class="chip" data-cat="Exterior">Exterior</button>
+      <button class="chip" data-cat="Interior">Interior</button>
+      <button class="chip" data-cat="Systems">Systems</button>
+    </div>
+    <label class="tb-label">Urgency ≥ <input type="range" id="fUrg" min="1" max="5" value="1"><span id="fUrgV">1</span></label>
+    <label class="tb-label"><input type="checkbox" id="fSafe"> 🚨 Safety only</label>
+    <label class="tb-label"><input type="checkbox" id="fDone" checked> Show completed</label>
+    <select id="sortBy" class="mini" title="Sort">
+      <option value="score">Sort: Priority</option>
+      <option value="urgency">Sort: Urgency</option>
+      <option value="cost">Sort: Cost</option>
+      <option value="year">Sort: Planned year</option>
+      <option value="title">Sort: A–Z</option>
+    </select>
+    <div class="spacer"></div>
+    <button class="btn primary" id="addJobBtn">+ Add job</button>
+  </div>
+  <div class="card" style="padding:0 0 4px">
+    <div class="job-head">
+      <span></span><span>✓</span><span>Job</span><span>Area</span><span>Urgency</span><span>Imp.</span><span>Score</span><span>🚨</span><span style="text-align:right">Est. Cost</span><span>Who</span><span>Quotes</span>
+    </div>
+    <div id="jobList"></div>
+    <div class="list-foot" id="listFoot"></div>
+  </div>
+</main>
+
+<main id="view-dashboard" hidden>
+  <div class="card toolbar">
+    <label class="tb-label">Urgency ≥ <input type="range" id="dUrg" min="1" max="5" value="1"><span id="dUrgV">1</span></label>
+    <label class="tb-label"><input type="checkbox" id="dSafe"> 🚨 Safety only</label>
+    <div class="chiprow" id="dCatChips">
+      <button class="chip on" data-cat="">All</button>
+      <button class="chip" data-cat="Exterior">Exterior</button>
+      <button class="chip" data-cat="Interior">Interior</button>
+      <button class="chip" data-cat="Systems">Systems</button>
+    </div>
+    <select id="dBasis" class="mini">
+      <option value="">All estimates</option>
+      <option value="quote">Quote-backed only</option>
+      <option value="researched">Researched only</option>
+    </select>
+    <label class="tb-label"><input type="checkbox" id="dDone"> Include completed</label>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card">
+    <h3 style="font-size:16px;margin-bottom:6px">Projected spend by year <span style="font-weight:400;font-size:12px;color:var(--ink2)">(mid-point of estimate range, colored by urgency)</span></h3>
+    <div id="yearBars"></div>
+    <div class="legend" id="yearLegend"></div>
+  </div>
+  <div class="card">
+    <h3 style="font-size:16px;margin-bottom:10px">Breakdown</h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:24px">
+      <div><div class="section-h" style="margin-top:0">By urgency</div><table class="mini-t" id="tblUrg"></table></div>
+      <div><div class="section-h" style="margin-top:0">By area</div><table class="mini-t" id="tblCat"></table></div>
+    </div>
+  </div>
+  <div class="card">
+    <details class="budget" id="budgetPanel">
+      <summary>💰 Budget planner (funds vs. projected costs)</summary>
+      <div class="budget-grid">
+        <label>Funds available (USD)<br><input id="funds" inputmode="numeric" placeholder="$0"></label>
+        <div style="flex:1;min-width:220px">
+          <div style="display:flex;justify-content:space-between;font-size:13px"><span id="fundPct"></span><span id="fundGap"></span></div>
+          <div class="fundbar"><div id="fundFill" style="width:0%"></div></div>
+          <div style="font-size:12px;color:var(--ink2)" id="fundNote"></div>
+        </div>
+      </div>
+      <table class="mini-t" id="tblFund"></table>
+    </details>
+  </div>
+</main>
+
+<main id="view-activity" hidden>
+  <div class="card">
+    <h3 style="font-size:16px;margin-bottom:8px">Activity log</h3>
+    <p style="font-size:12.5px;color:var(--ink2);margin-top:0">Every change is recorded here (also saved as CHANGELOG.md in the repository).</p>
+    <div id="logList">Loading…</div>
+  </div>
+</main>
+</div>
+
+<script>
+"use strict";
+/* ================= CONFIG (auth blobs injected at build time) ================= */
+const REPO = "birdofnofeather/HouseRepairTracker";
+const AUTH = [{"id": "MT", "name": "Max", "initials": "MT", "greet": "Hi Max!", "write": true, "salt": "uMKDuicdlVmzOes+GUJbGg==", "iv": "ECcmHoZSkcvr3O6R", "ct": "wNfpE+Gk2YsFa4k9q/GnOcXC0pwAqOKxtZ8RjVxNVx0/FHA0aALAwwAXzV03Na3ykpFfh6ietD2ZUOkksvetyQQ9SQ4lwYVw9SFE2c1O63y2YEkjs6JRgR/1uC4vfZr8PNtxCOC7F06De+Z0Dw=="}, {"id": "AB", "name": "Bog", "initials": "AB", "greet": "Hi Bog!", "write": true, "salt": "xqGmThgpowpD5QGi0Bhx8Q==", "iv": "oM4w+T87k3kzmX4Y", "ct": "Wur+yCGnL4FiMGGiqpaHTe+ZsUi08pSJFR7W3mUb2ixke3TRaBO+5K7WF/KJXNaQKLkdJ7SS5M0eapOj+Tn0J3MRL7JOwtabZXIaMwiVjswxAZ0ekpac9k+rlmFCGIaM9ED+oQmdQnnEOdVP2A=="}, {"id": "Guest", "name": "Guest", "initials": "G", "greet": "Welcome guest!", "write": false, "salt": "cZ5j3PTiaGmaKYzN15lNXA==", "iv": "c8JZjJLHuIOyuidj", "ct": "zSoqibchp3Inq/+g0iotpUEy/X8VhwmNEZv3w/LDtIZR+sCYznJ/+6KZzkTJKX7nN2Kid5TCXuE79s9QKu0BCY6zg9gzs3ofq4kiqhZtE74JuUoYM8V6oWLPD7o8o/m/zVtC41UHmv9bj/NMtg=="}];
+const PBKDF2_ITERS = 310000;
+
+/* ================= UTIL ================= */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s??"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const uid = () => Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-3);
+const usd = n => n==null||isNaN(n) ? "—" : "$" + Number(n).toLocaleString("en-US",{maximumFractionDigits: Number.isInteger(+n)?0:2});
+const usdShort = n => n>=1000 ? "$"+Math.round(n/1000)+"k" : usd(n);
+const parseAmt = s => { const v = parseFloat(String(s).replace(/[$,\s]/g,"")); return isNaN(v)?null:v; };
+const mid = j => ((+j.estLow||0)+(+j.estHigh||+j.estLow||0))/2;
+const score = j => (+j.urgency||1)*(+j.importance||1);
+const band = sc => sc>=20?["Critical","s-crit"]:sc>=15?["High","s-high"]:sc>=10?["Medium","s-med"]:["Low","s-low"];
+const URG_LABEL = {5:"5 · Now",4:"4 · <6 mo",3:"3 · <1 yr",2:"2 · 1–2 yrs",1:"1 · Someday"};
+const UCOL = {5:"var(--u5)",4:"var(--u4)",3:"var(--u3)",2:"var(--u2)",1:"var(--u1)"};
+const nowStamp = () => new Date().toLocaleString("en-US",{month:"short",day:"numeric",year:"numeric",hour:"numeric",minute:"2-digit"});
+
+function normalizeDate(str){
+  if(!str) return null;
+  str = String(str).trim();
+  let m;
+  if(m = str.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/)) return iso(+m[1],+m[2],+m[3]);
+  if(m = str.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/)){
+    let y = +m[3]; if(y<100) y += 2000;
+    return iso(y,+m[1],+m[2]);          // US: month/day/year
+  }
+  const d = new Date(str);
+  if(!isNaN(d)) return iso(d.getFullYear(), d.getMonth()+1, d.getDate());
+  return null;
+  function iso(y,mo,da){
+    if(mo<1||mo>12||da<1||da>31||y<1900||y>2100) return null;
+    return `${y}-${String(mo).padStart(2,"0")}-${String(da).padStart(2,"0")}`;
+  }
+}
+const b64ToBytes = b64 => Uint8Array.from(atob(b64), c=>c.charCodeAt(0));
+function bytesToB64(bytes){ let s=""; const arr = new Uint8Array(bytes); const CH=0x8000;
+  for(let i=0;i<arr.length;i+=CH) s += String.fromCharCode.apply(null, arr.subarray(i,i+CH));
+  return btoa(s); }
+const utf8ToB64 = str => bytesToB64(new TextEncoder().encode(str));
+const b64ToUtf8 = b64 => new TextDecoder().decode(b64ToBytes(b64));
+
+/* ================= AUTH ================= */
+let USER = null, TOKEN = null, CANWRITE = false;
+
+async function tryLogin(pw){
+  const enc = new TextEncoder();
+  for(const a of AUTH){
+    try{
+      const km = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]);
+      const key = await crypto.subtle.deriveKey(
+        {name:"PBKDF2", salt:b64ToBytes(a.salt), iterations:PBKDF2_ITERS, hash:"SHA-256"},
+        km, {name:"AES-GCM", length:256}, false, ["decrypt"]);
+      const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv:b64ToBytes(a.iv)}, key, b64ToBytes(a.ct));
+      return {user:a, token:new TextDecoder().decode(pt)};
+    }catch(e){/* wrong password for this blob */}
+  }
+  return null;
+}
+
+$("#loginForm").addEventListener("submit", async e=>{
+  e.preventDefault();
+  const btn = e.target.querySelector("button"); btn.disabled = true; btn.textContent = "Checking…";
+  $("#loginErr").textContent = "";
+  const res = await tryLogin($("#pw").value);
+  btn.disabled = false; btn.textContent = "Enter";
+  if(!res){ $("#loginErr").textContent = "That password isn't recognized."; return; }
+  USER = res.user; TOKEN = res.token; CANWRITE = USER.write;
+  $("#login").hidden = true;
+  flashGreeting(USER.greet);
+  startApp();
+});
+
+function flashGreeting(text){
+  const bg = document.createElement("div"); bg.className = "flash-bg";
+  const ov = document.createElement("div"); ov.className = "flash-overlay";
+  ov.innerHTML = `<div class="flash-text">${esc(text)}</div>`;
+  document.body.append(bg, ov);
+  setTimeout(()=>{ bg.remove(); ov.remove(); }, 1650);
+}
+function flashEmoji(emoji){
+  const ov = document.createElement("div"); ov.className = "flash-overlay";
+  ov.innerHTML = `<div class="flash-emoji">${emoji}</div>`;
+  document.body.append(ov);
+  setTimeout(()=>ov.remove(), 1150);
+}
+
+/* ================= GITHUB API ================= */
+async function gh(path, opts={}){
+  const r = await fetch(`https://api.github.com/repos/${REPO}/${path}`, {
+    ...opts,
+    headers: {Authorization:"token "+TOKEN, Accept:"application/vnd.github+json",
+              ...(opts.body?{"Content-Type":"application/json"}:{}), ...(opts.headers||{})}
+  });
+  if(r.status===404) return {notFound:true, status:404};
+  if(!r.ok){ const t = await r.text(); const err = new Error(`GitHub ${r.status}: ${t.slice(0,200)}`); err.status = r.status; throw err; }
+  return r.status===204 ? {} : r.json();
+}
+async function ghGetFile(path){
+  const r = await gh(`contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`);
+  if(r.notFound) return null;
+  return {sha:r.sha, text: r.content!=null ? b64ToUtf8(r.content.replace(/\n/g,"")) : null, size:r.size};
+}
+async function ghPutFile(path, contentB64, message, sha){
+  const body = {message, content:contentB64, branch:"main"};
+  if(sha) body.sha = sha;
+  return gh(`contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`, {method:"PUT", body:JSON.stringify(body)});
+}
+async function ghDeleteFile(path, message){
+  const f = await gh(`contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`);
+  if(f.notFound) return;
+  return gh(`contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`, {method:"DELETE", body:JSON.stringify({message, sha:f.sha, branch:"main"})});
+}
+async function ghGetRaw(path){ // returns Blob (for viewing uploads incl. large/binary)
+  const r = await fetch(`https://api.github.com/repos/${REPO}/contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`,
+    {headers:{Authorization:"token "+TOKEN, Accept:"application/vnd.github.raw+json"}});
+  if(!r.ok) throw new Error("Could not fetch file ("+r.status+")");
+  return r.blob();
+}
+
+/* ================= STATE & PERSISTENCE ================= */
+let state = null, dataSha = null;
+let dirty = false, saveTimer = null, saving = false;
+let logQueue = [];
+
+function setSaveStatus(msg, err){ const el = $("#saveStatus"); el.textContent = msg; el.classList.toggle("err", !!err); }
+
+async function loadData(){
+  const f = await ghGetFile("data/data.json");
+  if(f){ state = JSON.parse(f.text); dataSha = f.sha; }
+  else { state = {version:1, settings:{fundsAvailable:0}, jobs:[]}; dataSha = null; }
+}
+function mutate(logMsg){
+  if(!CANWRITE) return false;
+  if(logMsg) logQueue.push(logMsg);
+  dirty = true;
+  setSaveStatus("Unsaved changes…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveNow, 1200);
+  return true;
+}
+async function saveNow(){
+  if(!dirty || saving || !CANWRITE) return;
+  saving = true; dirty = false;
+  setSaveStatus("Saving…");
+  try{
+    const content = utf8ToB64(JSON.stringify(state, null, 1));
+    try{
+      const r = await ghPutFile("data/data.json", content, `${USER.id}: update tracker data`, dataSha);
+      dataSha = r.content.sha;
+    }catch(e){
+      if(e.status===409 || e.status===422){ // stale sha — refetch & retry (last writer wins)
+        const f = await ghGetFile("data/data.json");
+        const r = await ghPutFile("data/data.json", content, `${USER.id}: update tracker data`, f && f.sha);
+        dataSha = r.content.sha;
+      } else throw e;
+    }
+    await flushLog();
+    setSaveStatus("All changes saved ✓ " + new Date().toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit"}));
+  }catch(e){
+    console.error(e); dirty = true;
+    setSaveStatus("⚠ Save failed — retrying…", true);
+    clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 5000);
+  }finally{ saving = false; }
+}
+window.addEventListener("beforeunload", e=>{ if(dirty||saving){ e.preventDefault(); e.returnValue=""; } });
+
+async function flushLog(){
+  if(!logQueue.length) return;
+  const entries = logQueue.splice(0);
+  const lines = entries.map(m=>`- **${nowStamp()}** — ${m}`).join("\n");
+  try{
+    const f = await ghGetFile("CHANGELOG.md");
+    let text = f ? f.text : "# Activity Log — Our House Repair Tracker\n\n";
+    const idx = text.indexOf("\n\n");
+    text = idx>=0 ? text.slice(0,idx+2) + lines + "\n" + text.slice(idx+2) : text + "\n" + lines + "\n";
+    await ghPutFile("CHANGELOG.md", utf8ToB64(text), `${USER.id}: log activity`, f && f.sha);
+  }catch(e){ console.error("log flush failed", e); logQueue.unshift(...entries); }
+}
+
+/* ================= FILTERS ================= */
+const tf = {q:"", cat:"", urg:1, safe:false, done:true, sort:"score"};
+const df = {urg:1, safe:false, cat:"", basis:"", done:false};
+
+function jobsFiltered(){
+  let js = state.jobs.filter(j =>
+    (!tf.q || (j.title+" "+(j.why||"")+" "+(j.notes||"")).toLowerCase().includes(tf.q.toLowerCase())) &&
+    (!tf.cat || j.category===tf.cat) &&
+    ((+j.urgency||1) >= tf.urg) &&
+    (!tf.safe || j.safety) &&
+    (tf.done || !j.done));
+  const cmp = {
+    score:(a,b)=>score(b)-score(a),
+    urgency:(a,b)=>(b.urgency||0)-(a.urgency||0)||score(b)-score(a),
+    cost:(a,b)=>mid(b)-mid(a),
+    year:(a,b)=>(a.plannedYear||9999)-(b.plannedYear||9999)||score(b)-score(a),
+    title:(a,b)=>a.title.localeCompare(b.title)
+  }[tf.sort];
+  js.sort((a,b)=>(a.done?1:0)-(b.done?1:0) || cmp(a,b));
+  return js;
+}
+
+/* ================= TRACKER RENDER ================= */
+const openCarets = new Set();
+
+function renderTracker(){
+  const js = jobsFiltered();
+  const host = $("#jobList");
+  if(!js.length){ host.innerHTML = `<div class="empty">No jobs match these filters.</div>`; $("#listFoot").innerHTML=""; return; }
+  host.innerHTML = js.map(j=>{
+    const sc = score(j), [bl,bc] = band(sc);
+    const hasSubs = (j.subtasks||[]).length>0;
+    const open = openCarets.has(j.id);
+    const subs = open ? `
+      <div class="subwrap">
+        ${(j.subtasks||[]).map(s=>`
+          <div class="subrow ${s.done?"done":""}">
+            <button class="cbx ${s.done?"done":""}" data-act="subdone" data-j="${j.id}" data-s="${s.id}" ${CANWRITE?"":"disabled"} title="${s.done?("Completed by "+(s.doneBy||"")):"Mark complete"}">${s.done?esc(s.doneBy||"✓"):""}</button>
+            <span class="stitle">${esc(s.title)}</span>
+            <select class="mini" data-act="subwho" data-j="${j.id}" data-s="${s.id}" ${CANWRITE?"":"disabled"} title="Assigned to">
+              <option value="">—</option><option ${s.assignee==="AB"?"selected":""}>AB</option><option ${s.assignee==="MT"?"selected":""}>MT</option>
+            </select>
+            ${CANWRITE?`<button class="del" data-act="subdel" data-j="${j.id}" data-s="${s.id}" title="Delete subtask">✕</button>`:""}
+          </div>`).join("")}
+        ${CANWRITE?`<form class="addsub" data-j="${j.id}"><input placeholder="+ Add a subtask (e.g., get quotes)…"><button class="btn ghost sm">Add</button></form>`:""}
+      </div>` : "";
+    return `
+    <div class="job-row ${j.done?"done":""}" data-id="${j.id}">
+      <button class="caret ${open?"open":""}" data-act="caret" data-j="${j.id}" title="${hasSubs?"Show subtasks":"Add subtasks"}" style="${hasSubs?"":"opacity:.25"}">▶</button>
+      <button class="cbx ${j.done?"done":""}" data-act="jobdone" data-j="${j.id}" ${CANWRITE?"":"disabled"} title="${j.done?("Completed by "+(j.doneBy||"")):"Mark job complete"}">${j.done?esc(j.doneBy||"✓"):""}</button>
+      <button class="jtitle" data-act="open" data-j="${j.id}">
+        ${j.safety?`<span class="safety" title="Safety issue">🚨</span>`:""}${esc(j.title)}
+        ${(j.quotes||[]).length?`<span class="qcount">💬 ${(j.quotes||[]).length}</span>`:""}
+        ${j.why?`<span class="whyhint">${esc(j.why)}</span>`:""}
+      </button>
+      <select class="mini" data-act="cat" data-j="${j.id}" ${CANWRITE?"":"disabled"}>
+        ${["Exterior","Interior","Systems"].map(c=>`<option ${j.category===c?"selected":""}>${c}</option>`).join("")}
+      </select>
+      <select class="mini" data-act="urg" data-j="${j.id}" ${CANWRITE?"":"disabled"} style="color:${UCOL[j.urgency||1]};font-weight:700">
+        ${[5,4,3,2,1].map(u=>`<option value="${u}" ${+j.urgency===u?"selected":""}>${URG_LABEL[u]}</option>`).join("")}
+      </select>
+      <select class="mini" data-act="imp" data-j="${j.id}" ${CANWRITE?"":"disabled"}>
+        ${[5,4,3,2,1].map(u=>`<option value="${u}" ${+j.importance===u?"selected":""}>${u}</option>`).join("")}
+      </select>
+      <span class="score ${bc}" title="Priority = urgency × importance (${bl})">${sc}</span>
+      <button class="safebtn ${j.safety?"on":""}" data-act="safety" data-j="${j.id}" ${CANWRITE?"":"disabled"} title="Toggle safety flag">🚨</button>
+      <span class="cost">${usd(j.estLow)}–${usd(j.estHigh)}<small>${j.estBasis==="quote"?"per quote":"researched"} · ${j.plannedYear||"—"}</small></span>
+      <select class="mini" data-act="who" data-j="${j.id}" ${CANWRITE?"":"disabled"}>
+        <option value="">—</option><option ${j.assignee==="AB"?"selected":""}>AB</option><option ${j.assignee==="MT"?"selected":""}>MT</option>
+      </select>
+      <button class="upl" data-act="upload" data-j="${j.id}" title="Upload a quote document">📎 Quote</button>
+      ${subs}
+    </div>`;
+  }).join("");
+  const lo = js.reduce((a,j)=>a+(+j.estLow||0),0), hi = js.reduce((a,j)=>a+(+j.estHigh||+j.estLow||0),0);
+  const open_ = js.filter(j=>!j.done);
+  $("#listFoot").innerHTML = `<span>${js.length} jobs shown (${open_.length} open)</span>
+    <span>Subtotal (shown): <b>${usd(lo)} – ${usd(hi)}</b></span>`;
+}
+
+/* tracker events (delegated) */
+$("#jobList").addEventListener("click", e=>{
+  const b = e.target.closest("[data-act]"); if(!b) return;
+  const j = state.jobs.find(x=>x.id===b.dataset.j); if(!j) return;
+  const act = b.dataset.act;
+  if(act==="caret"){ openCarets.has(j.id)?openCarets.delete(j.id):openCarets.add(j.id); renderTracker(); }
+  else if(act==="open"){ openJobModal(j.id); }
+  else if(act==="upload"){ openUploader(j.id); }
+  else if(act==="jobdone"){
+    if(!CANWRITE) return;
+    j.done = !j.done;
+    j.doneBy = j.done ? USER.initials : null;
+    j.doneAt = j.done ? new Date().toISOString() : null;
+    flashEmoji(j.done ? "🏆" : "😢");
+    mutate(`${USER.initials} ${j.done?"completed":"reopened"} job **${j.title}**`);
+    renderTracker();
+  }
+  else if(act==="safety"){
+    if(!CANWRITE) return;
+    j.safety = !j.safety;
+    mutate(`${USER.initials} ${j.safety?"flagged":"unflagged"} **${j.title}** as a safety issue`);
+    renderTracker();
+  }
+  else if(act==="subdone"){
+    if(!CANWRITE) return;
+    const s = j.subtasks.find(x=>x.id===b.dataset.s);
+    s.done = !s.done; s.doneBy = s.done ? USER.initials : null;
+    flashEmoji(s.done ? "🏆" : "😢");
+    mutate(`${USER.initials} ${s.done?"completed":"reopened"} subtask “${s.title}” on **${j.title}**`);
+    renderTracker();
+  }
+  else if(act==="subdel"){
+    if(!CANWRITE) return;
+    const s = j.subtasks.find(x=>x.id===b.dataset.s);
+    if(!confirm(`Delete subtask “${s.title}”?`)) return;
+    j.subtasks = j.subtasks.filter(x=>x.id!==s.id);
+    mutate(`${USER.initials} deleted subtask “${s.title}” from **${j.title}**`);
+    renderTracker();
+  }
+});
+$("#jobList").addEventListener("change", e=>{
+  const b = e.target.closest("[data-act]"); if(!b || !CANWRITE) return;
+  const j = state.jobs.find(x=>x.id===b.dataset.j); if(!j) return;
+  const act = b.dataset.act, v = b.value;
+  if(act==="cat"){ j.category = v; mutate(`${USER.initials} set area of **${j.title}** to ${v}`); }
+  else if(act==="urg"){ j.urgency = +v; mutate(`${USER.initials} set urgency of **${j.title}** to ${v}/5`); }
+  else if(act==="imp"){ j.importance = +v; mutate(`${USER.initials} set importance of **${j.title}** to ${v}/5`); }
+  else if(act==="who"){ j.assignee = v; mutate(`${USER.initials} assigned **${j.title}** to ${v||"nobody"}`); }
+  else if(act==="subwho"){ const s = j.subtasks.find(x=>x.id===b.dataset.s); s.assignee = v; mutate(`${USER.initials} assigned subtask “${s.title}” (${j.title}) to ${v||"nobody"}`); }
+  renderTracker();
+});
+$("#jobList").addEventListener("submit", e=>{
+  e.preventDefault();
+  const f = e.target.closest("form.addsub"); if(!f || !CANWRITE) return;
+  const j = state.jobs.find(x=>x.id===f.dataset.j);
+  const t = f.querySelector("input").value.trim(); if(!t) return;
+  (j.subtasks ||= []).push({id:uid(), title:t, done:false, doneBy:null, assignee:""});
+  mutate(`${USER.initials} added subtask “${t}” to **${j.title}**`);
+  renderTracker();
+});
+
+/* toolbar */
+$("#q").addEventListener("input", e=>{ tf.q = e.target.value; renderTracker(); });
+$("#catChips").addEventListener("click", e=>{
+  const c = e.target.closest(".chip"); if(!c) return;
+  tf.cat = c.dataset.cat;
+  $$("#catChips .chip").forEach(x=>x.classList.toggle("on", x===c));
+  renderTracker();
+});
+$("#fUrg").addEventListener("input", e=>{ tf.urg = +e.target.value; $("#fUrgV").textContent = e.target.value; renderTracker(); });
+$("#fSafe").addEventListener("change", e=>{ tf.safe = e.target.checked; renderTracker(); });
+$("#fDone").addEventListener("change", e=>{ tf.done = e.target.checked; renderTracker(); });
+$("#sortBy").addEventListener("change", e=>{ tf.sort = e.target.value; renderTracker(); });
+$("#addJobBtn").addEventListener("click", ()=>{
+  if(!CANWRITE) return alert("Guest access is read-only.");
+  const j = {id:uid(), title:"New job", category:"Exterior", urgency:3, importance:3, safety:false,
+    why:"", notes:"", status:"Open", assignee:"", estLow:0, estHigh:0, estBasis:"researched",
+    plannedYear:new Date().getFullYear(), done:false, doneBy:null, doneAt:null, subtasks:[], quotes:[],
+    createdAt:new Date().toISOString()};
+  state.jobs.unshift(j);
+  mutate(`${USER.initials} added job **New job**`);
+  renderTracker(); openJobModal(j.id);
+});
+
+/* ================= JOB DETAIL MODAL ================= */
+let modalJobId = null;
+
+function openJobModal(id){
+  modalJobId = id;
+  renderJobModal();
+}
+function closeModal(){ const m = $("#modalBg"); if(m) m.remove(); modalJobId = null; }
+
+function renderJobModal(){
+  const j = state.jobs.find(x=>x.id===modalJobId); if(!j) return;
+  const ro = CANWRITE ? "" : "disabled";
+  const years = []; for(let y=2025;y<=2033;y++) years.push(y);
+  const html = `
+  <div class="modal-bg" id="modalBg">
+    <div class="modal">
+      <h2>${j.safety?"🚨 ":""}<span id="mTitleTxt">${esc(j.title)}</span><button class="xclose" data-m="close">✕</button></h2>
+      <div class="fgrid">
+        <div class="f full"><label>Job name</label><input id="mTitle" value="${esc(j.title)}" ${ro}></div>
+        <div class="f full"><label>Why this job is needed</label><textarea id="mWhy" ${ro}>${esc(j.why||"")}</textarea></div>
+        <div class="f full"><label>Notes / plan</label><textarea id="mNotes" ${ro}>${esc(j.notes||"")}</textarea></div>
+        <div class="f"><label>Status</label>
+          <select id="mStatus" ${ro}>${["Open","In Progress","Getting Quotes","On Hold","Deferred","Blocked","Complete"].map(s=>`<option ${j.status===s?"selected":""}>${s}</option>`).join("")}</select></div>
+        <div class="f"><label>Planned year</label>
+          <select id="mYear" ${ro}>${years.map(y=>`<option ${j.plannedYear===y?"selected":""}>${y}</option>`).join("")}</select></div>
+        <div class="f"><label>Estimate low ($)</label><input id="mLow" value="${j.estLow??""}" inputmode="numeric" ${ro}></div>
+        <div class="f"><label>Estimate high ($)</label><input id="mHigh" value="${j.estHigh??""}" inputmode="numeric" ${ro}></div>
+        <div class="f"><label>Estimate basis</label>
+          <select id="mBasis" ${ro}><option value="researched" ${j.estBasis!=="quote"?"selected":""}>Researched estimate</option><option value="quote" ${j.estBasis==="quote"?"selected":""}>Actual quote</option></select></div>
+        <div class="f"><label>Safety issue</label>
+          <select id="mSafety" ${ro}><option value="no" ${!j.safety?"selected":""}>No</option><option value="yes" ${j.safety?"selected":""}>Yes 🚨</option></select></div>
+      </div>
+
+      <div class="section-h">Quotes &amp; estimates (${(j.quotes||[]).length})</div>
+      <div id="mQuotes">
+        ${(j.quotes||[]).map(q=>`
+        <div class="qcard">
+          <div class="qtop">
+            <b>${esc(q.contractor||"(no contractor)")}</b>
+            <span class="amt">${usd(q.amount)}</span>
+            <span class="tag ${q.basis==="quote"?"":"est"}">${q.basis==="quote"?"Actual quote":"Researched est."}</span>
+            <span class="qdate">${q.date||""}</span>
+            ${q.notes?`<span class="qdate" style="width:100%">${esc(q.notes)}</span>`:""}
+          </div>
+          <div class="qfiles">
+            ${(q.files||[]).map(fl=>`
+              <div class="qfile">📄 <span class="fn" title="${esc(fl.name)}">${esc(fl.name)}</span>
+                <button data-m="viewfile" data-q="${q.id}" data-f="${esc(fl.path)}">View</button>
+                ${CANWRITE?`<button class="rm" data-m="delfile" data-q="${q.id}" data-f="${esc(fl.path)}">Delete</button>`:""}
+              </div>`).join("")}
+          </div>
+          ${CANWRITE?`<div class="qact">
+            <button class="btn ghost sm" data-m="attach" data-q="${q.id}">📎 Attach file</button>
+            <button class="btn danger sm" data-m="delquote" data-q="${q.id}">Delete quote</button>
+          </div>`:""}
+        </div>`).join("") || `<div style="color:var(--ink2);font-size:13px;padding:6px 2px">No quotes yet.</div>`}
+      </div>
+      ${CANWRITE?`<div class="qact"><button class="btn ghost sm" data-m="addquote">+ Add quote</button><button class="btn ghost sm" data-m="upload">📎 Upload quote document</button></div>`:""}
+
+      <div class="section-h">Subtasks</div>
+      <div id="mSubs">
+        ${(j.subtasks||[]).map(s=>`
+          <div class="subrow ${s.done?"done":""}">
+            <button class="cbx ${s.done?"done":""}" data-m="subdone" data-s="${s.id}" ${ro}>${s.done?esc(s.doneBy||"✓"):""}</button>
+            <span class="stitle">${esc(s.title)}</span>
+            <select class="mini" data-m="subwho" data-s="${s.id}" ${ro}><option value="">—</option><option ${s.assignee==="AB"?"selected":""}>AB</option><option ${s.assignee==="MT"?"selected":""}>MT</option></select>
+            ${CANWRITE?`<button class="del" data-m="subdel" data-s="${s.id}">✕</button>`:""}
+          </div>`).join("") || `<div style="color:var(--ink2);font-size:13px">None.</div>`}
+        ${CANWRITE?`<form class="addsub" id="mAddSub"><input placeholder="+ Add subtask…"><button class="btn ghost sm">Add</button></form>`:""}
+      </div>
+
+      <div class="modal-actions">
+        ${CANWRITE?`<button class="btn danger" data-m="deljob">Delete job</button>`:""}
+        <div class="right"><button class="btn primary" data-m="close">Done</button></div>
+      </div>
+    </div>
+  </div>`;
+  closeModal(); modalJobId = j.id;
+  document.body.insertAdjacentHTML("beforeend", html);
+  const bg = $("#modalBg");
+  bg.addEventListener("mousedown", e=>{ if(e.target===bg) commitAndClose(); });
+
+  function commitField(el, key, label, numeric){
+    el.addEventListener("change", ()=>{
+      if(!CANWRITE) return;
+      let v = numeric ? (parseAmt(el.value)??0) : el.value;
+      if(j[key]===v) return;
+      j[key] = v;
+      mutate(`${USER.initials} updated ${label} on **${j.title}**`);
+      if(key==="title") $("#mTitleTxt").textContent = v;
+      renderTracker();
+    });
+  }
+  commitField($("#mTitle"),"title","name");
+  commitField($("#mWhy"),"why","the “why”");
+  commitField($("#mNotes"),"notes","notes");
+  commitField($("#mStatus"),"status","status");
+  commitField($("#mLow"),"estLow","low estimate",true);
+  commitField($("#mHigh"),"estHigh","high estimate",true);
+  commitField($("#mBasis"),"estBasis","estimate basis");
+  $("#mYear").addEventListener("change", ()=>{ j.plannedYear = +$("#mYear").value; mutate(`${USER.initials} set planned year of **${j.title}** to ${j.plannedYear}`); renderTracker(); });
+  $("#mSafety").addEventListener("change", ()=>{ j.safety = $("#mSafety").value==="yes"; mutate(`${USER.initials} ${j.safety?"flagged":"unflagged"} **${j.title}** as a safety issue`); renderTracker(); renderJobModal(); });
+
+  bg.addEventListener("click", async e=>{
+    const b = e.target.closest("[data-m]"); if(!b) return;
+    const act = b.dataset.m;
+    if(act==="close") return commitAndClose();
+    if(!CANWRITE && act!=="viewfile") return;
+    if(act==="addquote"){
+      (j.quotes ||= []).push({id:uid(), contractor:"", amount:null, basis:"quote", date:normalizeDate("today")||new Date().toISOString().slice(0,10), notes:"", files:[]});
+      const q = j.quotes[j.quotes.length-1];
+      const name = prompt("Contractor / business name:"); if(name===null){ j.quotes.pop(); return; }
+      q.contractor = name.trim()||"(unnamed)";
+      const amt = parseAmt(prompt("Quote amount (USD):")||""); q.amount = amt;
+      const basis = confirm("Is this an ACTUAL QUOTE from the contractor?\nOK = actual quote · Cancel = researched estimate");
+      q.basis = basis ? "quote" : "researched";
+      const d = normalizeDate(prompt("Date of quote (any format):")||"") || new Date().toISOString().slice(0,10);
+      q.date = d;
+      mutate(`${USER.initials} added a ${q.basis==="quote"?"quote":"researched estimate"} from ${q.contractor} (${usd(q.amount)}) to **${j.title}**`);
+      renderJobModal(); renderTracker();
+    }
+    else if(act==="delquote"){
+      const q = j.quotes.find(x=>x.id===b.dataset.q);
+      if(!confirm(`Delete the ${usd(q.amount)} quote from ${q.contractor}? Attached files will also be deleted.`)) return;
+      for(const fl of (q.files||[])){ try{ await ghDeleteFile(fl.path, `${USER.id}: delete quote file`); }catch(e){ console.error(e);} }
+      j.quotes = j.quotes.filter(x=>x.id!==q.id);
+      mutate(`${USER.initials} deleted the ${usd(q.amount)} quote from ${q.contractor} on **${j.title}**`);
+      renderJobModal(); renderTracker();
+    }
+    else if(act==="attach"){ openUploader(j.id, b.dataset.q); }
+    else if(act==="upload"){ openUploader(j.id); }
+    else if(act==="viewfile"){
+      b.textContent = "Opening…";
+      try{
+        const blob = await ghGetRaw(b.dataset.f);
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        setTimeout(()=>URL.revokeObjectURL(url), 60000);
+      }catch(e){ alert("Could not open file: "+e.message); }
+      b.textContent = "View";
+    }
+    else if(act==="delfile"){
+      const q = j.quotes.find(x=>x.id===b.dataset.q);
+      const fl = q.files.find(x=>x.path===b.dataset.f);
+      if(!confirm(`Delete file “${fl.name}”?`)) return;
+      try{ await ghDeleteFile(fl.path, `${USER.id}: delete quote file ${fl.name}`); }catch(e){ alert("Delete failed: "+e.message); return; }
+      q.files = q.files.filter(x=>x.path!==fl.path);
+      mutate(`${USER.initials} deleted quote file “${fl.name}” from **${j.title}**`);
+      renderJobModal();
+    }
+    else if(act==="subdone"){
+      const s = j.subtasks.find(x=>x.id===b.dataset.s);
+      s.done = !s.done; s.doneBy = s.done?USER.initials:null;
+      flashEmoji(s.done?"🏆":"😢");
+      mutate(`${USER.initials} ${s.done?"completed":"reopened"} subtask “${s.title}” on **${j.title}**`);
+      renderJobModal(); renderTracker();
+    }
+    else if(act==="subdel"){
+      const s = j.subtasks.find(x=>x.id===b.dataset.s);
+      if(!confirm(`Delete subtask “${s.title}”?`)) return;
+      j.subtasks = j.subtasks.filter(x=>x.id!==s.id);
+      mutate(`${USER.initials} deleted subtask “${s.title}” from **${j.title}**`);
+      renderJobModal(); renderTracker();
+    }
+    else if(act==="deljob"){
+      if(!confirm(`Delete the whole job “${j.title}”? Uploaded files stay in the repository.`)) return;
+      state.jobs = state.jobs.filter(x=>x.id!==j.id);
+      mutate(`${USER.initials} deleted job **${j.title}**`);
+      commitAndClose(); renderTracker();
+    }
+  });
+  bg.addEventListener("change", e=>{
+    const b = e.target.closest("[data-m=subwho]"); if(!b||!CANWRITE) return;
+    const s = j.subtasks.find(x=>x.id===b.dataset.s);
+    s.assignee = b.value;
+    mutate(`${USER.initials} assigned subtask “${s.title}” (${j.title}) to ${b.value||"nobody"}`);
+    renderTracker();
+  });
+  const asf = $("#mAddSub");
+  if(asf) asf.addEventListener("submit", e=>{
+    e.preventDefault();
+    const t = asf.querySelector("input").value.trim(); if(!t) return;
+    (j.subtasks ||= []).push({id:uid(), title:t, done:false, doneBy:null, assignee:""});
+    mutate(`${USER.initials} added subtask “${t}” to **${j.title}**`);
+    renderJobModal(); renderTracker();
+  });
+  function commitAndClose(){
+    ["mTitle","mWhy","mNotes","mLow","mHigh"].forEach(id=>{ const el = document.getElementById(id); if(el) el.dispatchEvent(new Event("change")); });
+    closeModal(); renderTracker();
+  }
+}
+
+/* ================= UPLOADER ================= */
+function sanitizeName(s, max){
+  s = String(s).replace(/[-\\/:*?"<>|#%~^]/g," ").replace(/\s+/g," ").trim();
+  if(s.length>max) s = s.slice(0,max-1).trimEnd()+"~";
+  return s;
+}
+function buildFileName(job, contractor, amount, dateIso, ext){
+  let name = `${sanitizeName(job,45)} - ${sanitizeName(contractor,30)} - ${usd(amount)} - ${dateIso}${ext}`;
+  if(name.length>110) name = `${sanitizeName(job,30)} - ${sanitizeName(contractor,22)} - ${usd(amount)} - ${dateIso}${ext}`;
+  return name;
+}
+
+function openUploader(jobId, quoteId){
+  if(!CANWRITE) return alert("Guest access is read-only.");
+  const j = state.jobs.find(x=>x.id===jobId); if(!j) return;
+  const qs = j.quotes||[];
+  const html = `
+  <div class="modal-bg" id="upBg">
+    <div class="modal narrow">
+      <h2>📎 Upload quote document<button class="xclose" id="upClose">✕</button></h2>
+      <p style="font-size:12.5px;color:var(--ink2);margin:6px 0 0">PDF, image, or text. The file is renamed automatically to<br><i>Job — Contractor — Cost — Date</i> and stored privately in GitHub.</p>
+      <div class="fgrid">
+        <div class="f full"><label>Job *</label><input id="upJob" value="${esc(j.title)}"><div class="hint" id="hJob"></div></div>
+        <div class="f full"><label>Attach to</label>
+          <select id="upQuote">
+            <option value="">➕ New quote entry</option>
+            ${qs.map(q=>`<option value="${q.id}" ${q.id===quoteId?"selected":""}>Existing: ${esc(q.contractor)} — ${usd(q.amount)}</option>`).join("")}
+          </select></div>
+        <div class="f"><label>Contractor / business *</label><input id="upCon"><div class="hint" id="hCon"></div></div>
+        <div class="f"><label>Cost (USD) *</label><input id="upAmt" inputmode="decimal" placeholder="e.g. 69,800"><div class="hint" id="hAmt"></div></div>
+        <div class="f"><label>Date of quote *</label><input id="upDate" placeholder="any format — e.g. 10/1/24"><div class="hint" id="hDate">Will be normalized</div></div>
+        <div class="f"><label>Amount is…</label><select id="upBasis"><option value="quote">Actual quote</option><option value="researched">Researched estimate</option></select></div>
+        <div class="f full"><label>File *</label><input type="file" id="upFile" accept=".pdf,.txt,.png,.jpg,.jpeg,.gif,.webp,.heic,.md,.csv,.doc,.docx"><div class="hint" id="hFile"></div></div>
+        <div class="f full"><label>Final file name</label><div class="hint" id="upPreview" style="font-size:12px;word-break:break-all">—</div></div>
+      </div>
+      <div class="modal-actions"><div class="right">
+        <button class="btn ghost" id="upCancel">Cancel</button>
+        <button class="btn primary" id="upGo">Upload</button>
+      </div></div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML("beforeend", html);
+  const bg = $("#upBg");
+  const close = ()=>bg.remove();
+  $("#upClose").onclick = close; $("#upCancel").onclick = close;
+  bg.addEventListener("mousedown", e=>{ if(e.target===bg) close(); });
+
+  const selQ = $("#upQuote");
+  const syncFromQuote = ()=>{
+    const q = qs.find(x=>x.id===selQ.value);
+    if(q){ $("#upCon").value = q.contractor||""; $("#upAmt").value = q.amount??""; $("#upDate").value = q.date||""; $("#upBasis").value = q.basis||"quote"; }
+    preview();
+  };
+  selQ.addEventListener("change", syncFromQuote);
+  if(quoteId) syncFromQuote();
+
+  function normDateField(){
+    const iso = normalizeDate($("#upDate").value);
+    const h = $("#hDate");
+    if($("#upDate").value.trim()==="") { h.textContent = "Will be normalized"; h.className = "hint"; return null; }
+    if(iso){ h.textContent = "→ "+iso; h.className = "hint"; if($("#upDate").value.trim()!==iso) $("#upDate").value = iso; return iso; }
+    h.textContent = "Couldn't read that date — try e.g. 10/1/2024"; h.className = "hint bad"; return null;
+  }
+  function preview(){
+    const f = $("#upFile").files[0];
+    const ext = f ? (f.name.match(/\.[A-Za-z0-9]+$/)||[""])[0].toLowerCase() : ".pdf";
+    const amt = parseAmt($("#upAmt").value);
+    const iso = normalizeDate($("#upDate").value) || "YYYY-MM-DD";
+    $("#upPreview").textContent = "uploads/" + buildFileName($("#upJob").value||"Job", $("#upCon").value||"Contractor", amt??0, iso, ext);
+  }
+  $("#upDate").addEventListener("change", ()=>{ normDateField(); preview(); });
+  ["upJob","upCon","upAmt"].forEach(id=>$("#"+id).addEventListener("input", preview));
+  $("#upFile").addEventListener("change", preview);
+  preview();
+
+  $("#upGo").addEventListener("click", async ()=>{
+    let ok = true;
+    const need = (id,hid,msg)=>{ const v = $("#"+id).value.trim(); const h = $("#"+hid); if(!v){ h.textContent = msg; h.className = "hint bad"; ok = false; } else { h.textContent = ""; h.className = "hint"; } return v; };
+    const jobName = need("upJob","hJob","Job name is required");
+    const con = need("upCon","hCon","Contractor is required");
+    const amt = parseAmt($("#upAmt").value);
+    if(amt==null){ $("#hAmt").textContent = "Cost is required (numbers only)"; $("#hAmt").className = "hint bad"; ok = false; } else { $("#hAmt").textContent = "→ "+usd(amt); $("#hAmt").className = "hint"; }
+    const iso = normDateField(); if(!iso) ok = false;
+    const file = $("#upFile").files[0];
+    if(!file){ $("#hFile").textContent = "Choose a file to upload"; $("#hFile").className = "hint bad"; ok = false; }
+    if(!ok) return;
+
+    const btn = $("#upGo"); btn.disabled = true; btn.textContent = "Uploading…";
+    try{
+      const ext = (file.name.match(/\.[A-Za-z0-9]+$/)||[".dat"])[0].toLowerCase();
+      let fname = buildFileName(jobName, con, amt, iso, ext);
+      let path = "uploads/" + fname;
+      const buf = await file.arrayBuffer();
+      const b64 = bytesToB64(buf);
+      // avoid collision: if exists, suffix (2)
+      let existing = await gh(`contents/${encodeURIComponent(path).replace(/%2F/g,"/")}`);
+      if(existing && !existing.notFound){
+        fname = fname.replace(ext, ` (2)${ext}`); path = "uploads/"+fname;
+      }
+      await ghPutFile(path, b64, `${USER.id}: upload quote ${fname}`);
+      // attach to quote entry
+      let q = qs.find(x=>x.id===selQ.value);
+      if(!q){
+        q = {id:uid(), contractor:con, amount:amt, basis:$("#upBasis").value, date:iso, notes:"", files:[]};
+        (j.quotes ||= []).push(q);
+      } else {
+        q.contractor = con; q.amount = amt; q.basis = $("#upBasis").value; q.date = iso;
+      }
+      (q.files ||= []).push({name:fname, path, uploadedBy:USER.initials, uploadedAt:new Date().toISOString()});
+      if(jobName!==j.title && jobName){ /* user corrected job name in uploader */ j.title = jobName; }
+      mutate(`${USER.initials} uploaded quote file “${fname}” (${con}, ${usd(amt)}) to **${j.title}**`);
+      close();
+      if(modalJobId===j.id) renderJobModal();
+      renderTracker();
+      flashEmoji("📎");
+    }catch(e){
+      alert("Upload failed: "+e.message);
+      btn.disabled = false; btn.textContent = "Upload";
+    }
+  });
+}
+
+/* ================= DASHBOARD ================= */
+function dashJobs(){
+  return state.jobs.filter(j =>
+    ((+j.urgency||1) >= df.urg) &&
+    (!df.safe || j.safety) &&
+    (!df.cat || j.category===df.cat) &&
+    (!df.basis || (j.estBasis||"researched")===df.basis) &&
+    (df.done || !j.done));
+}
+function renderDashboard(){
+  const js = dashJobs();
+  const open = js.filter(j=>!j.done);
+  const lo = open.reduce((a,j)=>a+(+j.estLow||0),0);
+  const hi = open.reduce((a,j)=>a+(+j.estHigh||+j.estLow||0),0);
+  const quoteBacked = open.filter(j=>j.estBasis==="quote").reduce((a,j)=>a+mid(j),0);
+  const doneJobs = state.jobs.filter(j=>j.done);
+  const spent = doneJobs.reduce((a,j)=>a+(j.actualCost!=null?+j.actualCost:mid(j)),0);
+  $("#kpis").innerHTML = `
+    <div class="kpi"><div class="lbl">Open jobs</div><div class="val">${open.length}</div><div class="sub">${js.length} matching filters</div></div>
+    <div class="kpi"><div class="lbl">🚨 Safety issues open</div><div class="val ${open.filter(j=>j.safety).length?"red":""}">${open.filter(j=>j.safety).length}</div></div>
+    <div class="kpi"><div class="lbl">Projected cost (open)</div><div class="val">${usdShort(lo)}–${usdShort(hi)}</div><div class="sub">mid ≈ ${usd(Math.round((lo+hi)/2))}</div></div>
+    <div class="kpi"><div class="lbl">Quote-backed</div><div class="val">${usd(Math.round(quoteBacked))}</div><div class="sub">mid-point of quote-based jobs</div></div>
+    <div class="kpi"><div class="lbl">Completed (est. spend)</div><div class="val">${usd(Math.round(spent))}</div><div class="sub">${doneJobs.length} jobs done</div></div>`;
+
+  // spend by year, stacked by urgency
+  const years = {};
+  open.forEach(j=>{ const y = j.plannedYear||"TBD"; (years[y] ||= {5:0,4:0,3:0,2:0,1:0}); years[y][+j.urgency||1] += mid(j); });
+  const ykeys = Object.keys(years).sort();
+  const maxY = Math.max(1,...ykeys.map(y=>Object.values(years[y]).reduce((a,b)=>a+b,0)));
+  $("#yearBars").innerHTML = ykeys.map(y=>{
+    const tot = Object.values(years[y]).reduce((a,b)=>a+b,0);
+    const segs = [5,4,3,2,1].filter(u=>years[y][u]>0).map(u=>
+      `<div style="width:${(years[y][u]/maxY*100)}%;background:${UCOL[u]}" title="Urgency ${u}: ${usd(Math.round(years[y][u]))}"></div>`).join("");
+    return `<div class="yrow"><div class="ylab">${y}</div><div class="yearbar">${segs}</div><div class="ytot"><b>${usd(Math.round(tot))}</b> projected</div></div>`;
+  }).join("") || `<div class="empty">Nothing matches these filters.</div>`;
+  $("#yearLegend").innerHTML = [5,4,3,2,1].map(u=>`<span><span class="dot" style="background:${UCOL[u]}"></span>${URG_LABEL[u]}</span>`).join("");
+
+  const rowsBy = (keyFn, keys) => keys.map(k=>{
+    const set = open.filter(j=>keyFn(j)===k);
+    if(!set.length) return "";
+    const l = set.reduce((a,j)=>a+(+j.estLow||0),0), h = set.reduce((a,j)=>a+(+j.estHigh||+j.estLow||0),0);
+    return `<tr><td>${k}</td><td class="r">${set.length}</td><td class="r">${usd(l)} – ${usd(h)}</td></tr>`;
+  }).join("");
+  $("#tblUrg").innerHTML = `<tr><th>Urgency</th><th class="r"># Jobs</th><th class="r">Est. range</th></tr>` +
+    rowsBy(j=>URG_LABEL[+j.urgency||1], [5,4,3,2,1].map(u=>URG_LABEL[u]));
+  $("#tblCat").innerHTML = `<tr><th>Area</th><th class="r"># Jobs</th><th class="r">Est. range</th></tr>` +
+    rowsBy(j=>j.category||"—", ["Exterior","Interior","Systems"]);
+
+  // budget planner
+  const funds = +state.settings.fundsAvailable||0;
+  $("#funds").value = funds ? funds.toLocaleString("en-US") : "";
+  const midTot = open.reduce((a,j)=>a+mid(j),0);
+  const pct = midTot ? Math.min(100, funds/midTot*100) : 0;
+  $("#fundFill").style.width = pct+"%";
+  $("#fundPct").textContent = `Funds cover ~${Math.round(pct)}% of projected (${usd(Math.round(midTot))} mid)`;
+  $("#fundGap").textContent = funds>=midTot ? `Surplus ${usd(Math.round(funds-midTot))}` : `Gap ${usd(Math.round(midTot-funds))}`;
+  $("#fundNote").textContent = "Mid-point planning figures. Update funds any time — saved automatically.";
+  let cum = 0;
+  $("#tblFund").innerHTML = `<tr><th>Year</th><th class="r">Projected (mid)</th><th class="r">Cumulative</th><th class="r">Funds left after</th></tr>` +
+    ykeys.map(y=>{
+      const tot = Object.values(years[y]).reduce((a,b)=>a+b,0); cum += tot;
+      const left = funds-cum;
+      return `<tr><td>${y}</td><td class="r">${usd(Math.round(tot))}</td><td class="r">${usd(Math.round(cum))}</td><td class="r" style="color:${left<0?"var(--red)":"var(--accent2)"}">${usd(Math.round(left))}</td></tr>`;
+    }).join("");
+}
+$("#dUrg").addEventListener("input", e=>{ df.urg = +e.target.value; $("#dUrgV").textContent = e.target.value; renderDashboard(); });
+$("#dSafe").addEventListener("change", e=>{ df.safe = e.target.checked; renderDashboard(); });
+$("#dDone").addEventListener("change", e=>{ df.done = e.target.checked; renderDashboard(); });
+$("#dBasis").addEventListener("change", e=>{ df.basis = e.target.value; renderDashboard(); });
+$("#dCatChips").addEventListener("click", e=>{
+  const c = e.target.closest(".chip"); if(!c) return;
+  df.cat = c.dataset.cat;
+  $$("#dCatChips .chip").forEach(x=>x.classList.toggle("on", x===c));
+  renderDashboard();
+});
+$("#funds").addEventListener("change", e=>{
+  if(!CANWRITE){ renderDashboard(); return; }
+  const v = parseAmt(e.target.value)||0;
+  state.settings.fundsAvailable = v;
+  mutate(`${USER.initials} set funds available to ${usd(v)}`);
+  renderDashboard();
+});
+
+/* ================= ACTIVITY ================= */
+async function renderActivity(){
+  const host = $("#logList");
+  host.textContent = "Loading…";
+  try{
+    const f = await ghGetFile("CHANGELOG.md");
+    if(!f){ host.textContent = "No activity yet."; return; }
+    const lines = f.text.split("\n").filter(l=>l.startsWith("- "));
+    host.innerHTML = lines.slice(0,300).map(l=>{
+      const m = l.match(/^- \*\*(.+?)\*\* — (.*)$/);
+      const body = (m?m[2]:l.slice(2)).replace(/\*\*(.+?)\*\*/g,"<b>$1</b>").replace(/“|”/g,'"');
+      return `<div class="logline"><span class="t">${esc(m?m[1]:"")}</span>${body}</div>`;
+    }).join("") || "No activity yet.";
+  }catch(e){ host.textContent = "Could not load log: "+e.message; }
+}
+
+/* ================= TABS & BOOT ================= */
+$$("nav.tabs button").forEach(b=>b.addEventListener("click", ()=>{
+  $$("nav.tabs button").forEach(x=>x.classList.toggle("active", x===b));
+  ["tracker","dashboard","activity"].forEach(t=>$("#view-"+t).hidden = t!==b.dataset.tab);
+  if(b.dataset.tab==="dashboard") renderDashboard();
+  if(b.dataset.tab==="activity") renderActivity();
+}));
+
+async function startApp(){
+  $("#userchip").innerHTML = `<span class="init">${esc(USER.initials)}</span><span>${esc(USER.name)}</span>${CANWRITE?"":'<span class="ro-badge">READ-ONLY</span>'}`;
+  $("#app").hidden = false;
+  setSaveStatus(CANWRITE ? "Loading…" : "Read-only mode");
+  try{
+    await loadData();
+    renderTracker();
+    if(CANWRITE) setSaveStatus("All changes saved ✓");
+  }catch(e){
+    $("#jobList").innerHTML = `<div class="empty">⚠ Could not load data: ${esc(e.message)}</div>`;
+    setSaveStatus("Load error", true);
+  }
+}
+</script>
+</body>
+</html>
